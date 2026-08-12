@@ -422,11 +422,11 @@ async function refresh(){
   const btn=document.getElementById('refreshBtn');
   const st=document.getElementById('status');
   btn.disabled=true; st.textContent='正在联网获取最新开奖…';
-  let updated=0, fails=0, latest='';
+  let updated=0, fails=0, latest='', lastErr='';
   for(const key of Object.keys(GAMES)){
     const gm=GAMES[key];
     try{
-      const r=await fetch(`http://api.huiniao.top/interface/home/lotteryHistory?type=${gm.type}&page=1&limit=8`);
+      const r=await fetch(`https://api.huiniao.top/interface/home/lotteryHistory?type=${gm.type}&page=1&limit=8`);
       const j=await r.json();
       const lst=j.data.data.list||[];
       for(const it of lst){
@@ -440,12 +440,12 @@ async function refresh(){
       }
       gm.data.sort((x,y)=>String(x.code).localeCompare(String(y.code)));
       latest=gm.data[gm.data.length-1].code;
-    }catch(e){ fails++; }
+    }catch(e){ fails++; lastErr=e.message; }
   }
   btn.disabled=false;
   renderAll();
   if(updated>0) st.textContent=`✅ 已追加 ${updated} 条新开奖（最新期号 ${latest}）。`;
-  else if(fails) st.textContent=`⚠️ 刷新失败（可能被浏览器/网络拦截）。仍可使用内置历史数据（最新 ${lastRec().code}）。建议重新打开页面或检查网络。`;
+  else if(fails) st.textContent=`⚠️ 刷新失败：${lastErr||'网络或浏览器拦截'}。仍可使用内置历史数据（最新 ${lastRec().code}）。如长期失败，多为接口限流或该源不可用。`;
   else st.textContent=`已是最新（最新期号 ${lastRec().code}）。`;
 }
 
