@@ -39,6 +39,8 @@ header .sub{color:var(--sub);font-size:12px}
 .refresh:disabled{opacity:.5;cursor:default}
 .predict-btn{padding:8px 16px;border-radius:10px;border:0;background:linear-gradient(135deg,#c0392b,#e8590c);color:#fff;cursor:pointer;font-size:13px;font-weight:700;box-shadow:var(--shadow)}
 .predict-btn:active{transform:translateY(1px)}
+.auto{padding:8px 14px;border-radius:10px;border:1px solid #2f9e44;background:#eaf6ec;color:#2f9e44;cursor:pointer;font-size:13px;font-weight:600}
+.auto.on{background:#2f9e44;color:#fff}
 .status{font-size:12px;color:var(--sub);margin:4px 2px}
 .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:12px 0}
 .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px}
@@ -100,6 +102,7 @@ footer{margin-top:24px;font-size:11.5px;color:var(--sub);line-height:1.7;border-
   <div class="toolbar">
     <div class="tabs" id="tabs"></div>
     <button class="refresh" id="refreshBtn">🔄 刷新最新开奖</button>
+    <button class="auto on" id="autoBtn">🔁 自动更新：开</button>
     <button class="predict-btn" id="predictBtn">🎯 推算下一期</button>
     <div class="win-sel" id="winSel">
       <span>样本窗口</span>
@@ -450,10 +453,10 @@ function renderAll(){
 }
 
 /* ---------- 联网刷新 ---------- */
-async function refresh(){
+async function refresh(bg){
   const btn=document.getElementById('refreshBtn');
   const st=document.getElementById('status');
-  btn.disabled=true; st.textContent='正在联网获取最新开奖…';
+  if(!bg){ btn.disabled=true; st.textContent='正在联网获取最新开奖…'; }
   let updated=0, fails=0, latest='', lastErr='';
   for(const key of Object.keys(GAMES)){
     const gm=GAMES[key];
@@ -474,15 +477,28 @@ async function refresh(){
       latest=gm.data[gm.data.length-1].code;
     }catch(e){ fails++; lastErr=e.message; }
   }
-  btn.disabled=false;
+  if(!bg) btn.disabled=false;
   saveStored();
   renderAll();
-  if(updated>0) st.textContent=`✅ 已联网追加 ${updated} 条新开奖，并自动补充进历史数据（当前玩法最新期号 ${lastRec().code}）。下一期预测已基于最新开奖重新计算；结果已本地保存，下次打开自动载入。`;
-  else if(fails) st.textContent=`⚠️ 刷新失败：${lastErr||'网络或浏览器拦截'}。仍可使用内置历史数据（最新 ${lastRec().code}）。如长期失败，多为接口限流或该源不可用。`;
-  else st.textContent=`已是最新（最新期号 ${lastRec().code}）。`;
+  const tag = bg ? '自动' : '';
+  if(updated>0) st.textContent=`✅ ${tag}已联网追加 ${updated} 条新开奖，并自动补充进历史数据（当前玩法最新期号 ${lastRec().code}）。下一期预测已基于最新开奖重新计算；结果已本地保存，下次打开自动载入。`;
+  else if(fails) st.textContent=`⚠️ ${tag}刷新失败：${lastErr||'网络或浏览器拦截'}。仍可使用内置历史数据（最新 ${lastRec().code}）。如长期失败，多为接口限流或该源不可用。`;
+  else st.textContent=`${tag}已是最新（最新期号 ${lastRec().code}）。`;
 }
 
 document.getElementById('refreshBtn').onclick=refresh;
+
+/* ---------- 自动更新（后台定时刷新 + 打开即拉取） ---------- */
+let autoTimer=null;
+function setAuto(on){
+  state.auto=on;
+  const b=document.getElementById('autoBtn');
+  b.textContent = on ? '🔁 自动更新：开' : '🔁 自动更新：关';
+  b.classList.toggle('on', on);
+  if(autoTimer){ clearInterval(autoTimer); autoTimer=null; }
+  if(on){ autoTimer=setInterval(()=>{ refresh(true); }, 30*60*1000); } // 每 30 分钟后台刷新
+}
+document.getElementById('autoBtn').onclick=()=>setAuto(!state.auto);
 
 /* ---------- 推算下一期按钮 ---------- */
 function calcNext(){
@@ -501,6 +517,8 @@ document.getElementById('predictBtn').onclick=calcNext;
 /* ---------- 初始化 ---------- */
 loadStored();
 renderAll();
+setAuto(true);                 // 开启自动更新（后台每 30 分钟刷新）
+setTimeout(()=>{ refresh(true); }, 1500);  // 打开页面即自动拉取最新开奖
 </script>
 </body>
 </html>
