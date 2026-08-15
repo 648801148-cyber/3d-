@@ -163,6 +163,34 @@ function winData(){
 }
 function lastRec(){ const a=allData(); return a[a.length-1]; }
 
+/* ---------- 本地持久化：刷新结果补充进历史数据，跨刷新保留 ---------- */
+let localCachedCount=0;
+function loadStored(){
+  localCachedCount=0;
+  for(const key of Object.keys(GAMES)){
+    const gm=GAMES[key];
+    try{
+      const raw=localStorage.getItem('lh_'+key);
+      if(!raw) continue;
+      const saved=JSON.parse(raw);
+      const byCode=new Map(gm.data.map(r=>[r.code,r]));
+      let added=0;
+      for(const r of (saved.data||[])){ if(!byCode.has(r.code)){ byCode.set(r.code,r); added++; } }
+      if(added>0){
+        gm.data=[...byCode.values()].sort((x,y)=>String(x.code).localeCompare(String(y.code)));
+        localCachedCount+=added;
+      }
+      if(saved.next) gm.next=saved.next;
+    }catch(e){}
+  }
+}
+function saveStored(){
+  for(const key of Object.keys(GAMES)){
+    const gm=GAMES[key];
+    try{ localStorage.setItem('lh_'+key, JSON.stringify({data:gm.data, next:gm.next||null})); }catch(e){}
+  }
+}
+
 /* ---------- 统计核心 ---------- */
 function freqAt(pi, data){
   const f=new Array(10).fill(0);
@@ -349,7 +377,7 @@ function predict(){
     }
     combos.push(combo);
   }
-  return {hot,cold,neighbor,mean,combos,latest};
+  return {hot,cold,neighbor,mean,combos,latest,latestCode:win[win.length-1].code};
 }
 function renderPred(){
   const pr=predict();
@@ -366,7 +394,7 @@ function renderPred(){
   });
   document.getElementById('predBox').innerHTML=html;
   document.getElementById('combos').innerHTML=pr.combos.map(c=>`<div class="combo">${c.join('')}<small>直选参考</small></div>`).join('');
-  document.getElementById('predNote').innerHTML=`基于「${WIN_LABEL[state.win]}」样本，由 热号/冷号/邻号/均值 四类思路轮换合成 ${pr.combos.length} 注参考组合。上期开奖：${pr.latest.join(' ')}。再次强调：仅供娱乐参考，不保证中奖。`;
+  document.getElementById('predNote').innerHTML=`基于「${WIN_LABEL[state.win]}」样本，由 热号/冷号/邻号/均值 四类思路轮换合成 ${pr.combos.length} 注参考组合。推算基准（最新一期）<b>${pr.latestCode}</b>：${pr.latest.join(' ')}（刷新追加的最新开奖已纳入历史并参与统计）。再次强调：仅供娱乐参考，不保证中奖。`;
 }
 
 /* ---------- 五码预测（五选三 · 组选复试） ---------- */
@@ -417,7 +445,8 @@ function renderAll(){
   buildTabs(); buildWinSel();
   renderCards(); renderPositions(); renderCombo(); renderPred(); renderFive();
   const a=allData();
-  document.getElementById('status').textContent=`已加载 ${g().name}：${a[0].code}(${a[0].day}) ~ ${a[a.length-1].code}(${a[a.length-1].day})，共 ${a.length} 期。点击右上角可刷新最新开奖。`;
+  const extra = localCachedCount>0 ? `（含本地补充 ${localCachedCount} 条，已自动载入历史数据）` : '';
+  document.getElementById('status').textContent=`已加载 ${g().name}：${a[0].code}(${a[0].day}) ~ ${a[a.length-1].code}(${a[a.length-1].day})，共 ${a.length} 期。点击右上角可刷新最新开奖。${extra}`;
 }
 
 /* ---------- 联网刷新 ---------- */
@@ -446,8 +475,9 @@ async function refresh(){
     }catch(e){ fails++; lastErr=e.message; }
   }
   btn.disabled=false;
+  saveStored();
   renderAll();
-  if(updated>0) st.textContent=`✅ 已追加 ${updated} 条新开奖（最新期号 ${latest}）。`;
+  if(updated>0) st.textContent=`✅ 已联网追加 ${updated} 条新开奖，并自动补充进历史数据（当前玩法最新期号 ${lastRec().code}）。下一期预测已基于最新开奖重新计算；结果已本地保存，下次打开自动载入。`;
   else if(fails) st.textContent=`⚠️ 刷新失败：${lastErr||'网络或浏览器拦截'}。仍可使用内置历史数据（最新 ${lastRec().code}）。如长期失败，多为接口限流或该源不可用。`;
   else st.textContent=`已是最新（最新期号 ${lastRec().code}）。`;
 }
@@ -469,6 +499,7 @@ function calcNext(){
 document.getElementById('predictBtn').onclick=calcNext;
 
 /* ---------- 初始化 ---------- */
+loadStored();
 renderAll();
 </script>
 </body>
