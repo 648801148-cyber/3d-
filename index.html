@@ -116,6 +116,13 @@ footer{margin-top:24px;font-size:11.5px;color:var(--sub);line-height:1.7;border-
 .dfj-numrow .n.cold{color:var(--cold);border-color:#c7d6f4}
 .dfj-tag{display:inline-block;font-size:10px;font-weight:400;color:var(--sub);margin-left:6px}
 .dfj-empty{background:var(--chip);border-radius:8px;padding:14px;text-align:center;color:var(--sub);font-size:13px}
+.dfj-divider{height:1px;background:linear-gradient(90deg,transparent,var(--line),transparent);margin:14px 0 6px}
+.dfj-pos{margin-left:38px;display:flex;flex-wrap:wrap;gap:16px;padding:4px 0}
+.dfj-pos .pos{display:flex;align-items:center;gap:5px;font-size:12.5px;color:var(--sub)}
+.dfj-pos .pos b{color:var(--ink);font-weight:700;font-size:13px}
+.dfj-pos .pos .n{font-size:13px;padding:1px 6px}
+.dfj-pred{margin-left:38px}
+.dfj-pred .n{background:linear-gradient(180deg,#fff,#fff6ec);border-color:#f0d9bf;color:var(--red)}
 </style>
 </head>
 <body>
@@ -666,6 +673,10 @@ function renderDFJ(){
   const anchorStr=r.anchors.length? `<span class="anchor">《<b>${r.anchors.join(' ')}</b>》</span>`:'';
   const zhiHtml=r.zhi.map(n=>`<span class="n">${n}</span>`).join('');
   const duiHtml=r.dui.map(n=>`<span class="n">${n}</span>`).join('');
+  // 下一期推测：复用数据合成预测（热/冷/邻/均 四类思路），折叠进本卡
+  const pr=predict();
+  const posHtml=pr.hot.map((h,pi)=>`<span class="pos"><b>${g().pos[pi]}</b>${h.map(v=>`<span class="n hot">${v}</span>`).join('')}</span>`).join('');
+  const predCombosHtml=pr.combos.map(c=>`<span class="n">${c.join('')}</span>`).join('');
   const html=`
     <div class="dfj-head">
       <span class="ttl">${g().name}</span>
@@ -682,9 +693,13 @@ function renderDFJ(){
     <div class="dfj-numrow">${zhiHtml}</div>
     <div class="dfj-sub"><span class="lbl2">对</span>${anchorStr}<span class="dfj-tag">组三（含对子）· 共 ${r.dui.length} 注</span></div>
     <div class="dfj-numrow">${duiHtml}</div>
+    <div class="dfj-divider"></div>
+    <div class="dfj-sub"><span class="lbl2">下一期推测</span><span class="dfj-tag">数据合成 · 直选参考（热/冷/邻/均 四类思路轮换）</span></div>
+    <div class="dfj-pos">${posHtml}</div>
+    <div class="dfj-numrow dfj-pred">${predCombosHtml}</div>
   `;
   document.getElementById('dfjBox').innerHTML=html;
-  document.getElementById('dfjNote').innerHTML=`<b>说明</b>：「独」=胆码（窗口频次 Top2，最可能开出）；「飞」=两码组合（独∪独 / 独∪support / support∪support）；「精」=精选 3 位数（独[0]+飞数字两两配对）；「四/五/六」=号码池长度递增；「直」=组六候选（${r.zhi.length} 注，<b>三不同</b>）；「对」=组三候选（${r.dui.length} 注，<b>含对子</b>）。锚定期号《${r.anchors.join(' ')}》为最近 2 期开奖，仅供参考。仅供娱乐参考，不保证中奖。`;
+  document.getElementById('dfjNote').innerHTML=`<b>说明</b>：「独」=胆码（窗口频次 Top2，最可能开出）；「飞」=两码组合（独∪独 / 独∪support / support∪support）；「精」=精选 3 位数（独[0]+飞数字两两配对）；「四/五/六」=号码池长度递增；「直」=组六候选（${r.zhi.length} 注，<b>三不同</b>）；「对」=组三候选（${r.dui.length} 注，<b>含对子</b>）。锚定期号《${r.anchors.join(' ')}》为最近 2 期开奖。「下一期推测」= 由 热号/冷号/邻号/均值 四类思路轮换合成 ${pr.combos.length} 注直选参考（已排除上一期本身）。仅供娱乐参考，不保证中奖。`;
 }
 
 /* ---------- 交互 ---------- */
