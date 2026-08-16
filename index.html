@@ -89,6 +89,33 @@ section h2{font-size:16px;border-left:4px solid var(--blue);padding-left:8px;mar
 .combo small{display:block;font-size:10px;letter-spacing:0;font-weight:400;opacity:.8;text-align:center;margin-top:2px}
 footer{margin-top:24px;font-size:11.5px;color:var(--sub);line-height:1.7;border-top:1px solid var(--line);padding-top:12px}
 .note{font-size:11.5px;color:var(--sub);margin-top:4px}
+/* 独飞精 · 胆码推荐 */
+.dfj{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;box-shadow:var(--shadow)}
+.dfj-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;border-bottom:1px solid var(--line);padding-bottom:8px;margin-bottom:10px}
+.dfj-head .ttl{font-size:15px;font-weight:700;color:var(--red)}
+.dfj-head .date{font-size:12px;color:var(--sub);background:var(--chip);padding:2px 8px;border-radius:6px}
+.dfj-head .legend{font-size:11px;color:var(--sub);margin-left:auto}
+.dfj-row{display:flex;align-items:center;flex-wrap:wrap;gap:6px;padding:6px 0;border-bottom:0.5px solid #f0e2cf}
+.dfj-row:last-child{border-bottom:none}
+.dfj-row .lbl{flex:0 0 32px;font-weight:700;color:var(--red);font-size:14px;text-align:center;background:rgba(232,89,12,.08);padding:3px 0;border-radius:5px}
+.dfj-row .v{display:flex;align-items:center;flex-wrap:wrap;gap:6px;font-variant-numeric:tabular-nums;font-weight:700;letter-spacing:1px}
+.dfj-row .v .pair{background:#fff5ec;padding:2px 7px;border-radius:6px;color:var(--ink);font-size:13px;border:1px solid var(--line)}
+.dfj-row .v .pair.hot{background:#fdecec;color:var(--hot);border-color:#f5cbcb}
+.dfj-row .v .pair.cold{background:#e9f0fe;color:var(--cold);border-color:#c7d6f4}
+.dfj-row .v .num{font-size:15px;color:var(--ink);font-weight:700;letter-spacing:2px;font-variant-numeric:tabular-nums;background:#fff;padding:2px 8px;border:1px solid var(--line);border-radius:6px}
+.dfj-row .v .num.hot{color:var(--hot);border-color:#f5cbcb}
+.dfj-row .v .num.cold{color:var(--cold);border-color:#c7d6f4}
+.dfj-row .v .set{background:#fff;border:1px solid var(--line);padding:2px 8px;border-radius:6px;font-size:13px;letter-spacing:2px;color:var(--ink)}
+.dfj-sub{margin:6px 0 4px 38px;display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}
+.dfj-sub .lbl2{font-weight:700;color:var(--red);font-size:13.5px}
+.dfj-sub .anchor{color:var(--sub);font-size:12.5px;font-weight:600}
+.dfj-sub .anchor b{color:var(--ink)}
+.dfj-numrow{margin-left:38px;display:flex;flex-wrap:wrap;gap:6px;padding:4px 0}
+.dfj-numrow .n{font-weight:700;font-size:15px;letter-spacing:2px;font-variant-numeric:tabular-nums;color:var(--ink);background:#fff;padding:2px 8px;border:1px solid var(--line);border-radius:6px}
+.dfj-numrow .n.hot{color:var(--hot);border-color:#f5cbcb}
+.dfj-numrow .n.cold{color:var(--cold);border-color:#c7d6f4}
+.dfj-tag{display:inline-block;font-size:10px;font-weight:400;color:var(--sub);margin-left:6px}
+.dfj-empty{background:var(--chip);border-radius:8px;padding:14px;text-align:center;color:var(--sub);font-size:13px}
 </style>
 </head>
 <body>
@@ -136,6 +163,12 @@ footer{margin-top:24px;font-size:11.5px;color:var(--sub);line-height:1.7;border-
     <h2>五码预测（五选三 · 组选复试）</h2>
     <div class="pred-grid" id="fiveBox"></div>
     <div class="note" id="fiveNote" style="margin-top:8px"></div>
+  </section>
+
+  <section>
+    <h2>独飞精 · 胆码推荐（师傅格式）</h2>
+    <div class="dfj" id="dfjBox"></div>
+    <div class="note" id="dfjNote" style="margin-top:8px"></div>
   </section>
 
   <footer>
@@ -543,6 +576,102 @@ function renderFive(){
   document.getElementById('fiveNote').innerHTML=note;
 }
 
+/* ---------- 独飞精 · 胆码推荐（师傅格式） ---------- */
+function duFeiJing(){
+  const win=winData();
+  const npos=g().pos.length;
+  if(npos!==3) return null;                  // 仅 3 位玩法（福彩3D / 排列三）
+  const {hot,cold,groupA,groupB}=fiveSets();
+  // 独 (胆码) = 窗口频次 Top2（最可能开出）
+  const du=[hot[0],hot[1]];
+  // supports = 第3、4 热号
+  const supports=[hot[2],hot[3]];
+  const feiDigits=[...new Set([...du, ...supports])];   // 飞涉及的数字 = 独 ∪ supports
+  // 飞 (两码) = 3 two-digit pairs：独∪独 / 独∪support / support∪support
+  const pair=(a,b)=>[a,b].sort((x,y)=>x-y).join('');
+  const fei=[
+    pair(du[0],du[1]),
+    pair(du[0],supports[0]),
+    pair(supports[0],supports[1])
+  ];
+  // 精 (精选 3 位数) = 独[0] + 飞数字的两两组合，共 4 注
+  const jing=[];
+  for(let i=0;i<feiDigits.length && jing.length<4;i++){
+    for(let j=i+1;j<feiDigits.length && jing.length<4;j++){
+      jing.push([du[0],feiDigits[i],feiDigits[j]].join(''));
+    }
+  }
+  // 四/五/六：四码=独+supports，五码=四+top-2 冷，六码=五+top-3 冷
+  const si=[...du, ...supports].slice(0,4);
+  const wu=[...si, ...cold.slice(0,2)].slice(0,5);
+  const liu=[...wu, ...cold.slice(0,3)].slice(0,6);
+  // 直 (组六 10 注)：从六码枚举 C(6,3)=20，按「含独[0]+含独[1]」权重排前 10
+  const sixCands=[];
+  for(let i=0;i<liu.length;i++)
+    for(let j=i+1;j<liu.length;j++)
+      for(let k=j+1;k<liu.length;k++)
+        sixCands.push([liu[i],liu[j],liu[k]]);
+  sixCands.sort((a,b)=>{
+    const sa=(a.includes(du[0])?2:0)+(a.includes(du[1])?1:0);
+    const sb=(b.includes(du[0])?2:0)+(b.includes(du[1])?1:0);
+    return sb-sa;
+  });
+  const zhi=sixCands.slice(0,10).map(a=>a.join(''));
+  // 对 (组三 10 注)：独∪supports 中两两形成「a,a,b」组三
+  const duiSet=new Set(), duiList=[];
+  for(let i=0;i<feiDigits.length;i++){
+    for(let j=0;j<feiDigits.length;j++){
+      if(i===j) continue;
+      const num=[feiDigits[i],feiDigits[i],feiDigits[j]].join('');
+      if(!duiSet.has(num)){ duiSet.add(num); duiList.push(num); }
+    }
+  }
+  const dui=duiList.slice(0,10);
+  // 直/对的「锚定」参照 = 最近 2 期开奖（用作《》括号内的参考期号）
+  const last2 = win.slice(-2);
+  const anchors = [last2[last2.length-2]?.code, last2[last2.length-1]?.code].filter(Boolean);
+  return {du, fei, jing, si, wu, liu, zhi, dui, anchors};
+}
+function renderDFJ(){
+  const r=duFeiJing();
+  const npos=g().pos.length;
+  const today=new Date();
+  const dateStr=`${today.getFullYear()}.${String(today.getMonth()+1).padStart(2,'0')}.${String(today.getDate()).padStart(2,'0')}`;
+  if(!r){
+    document.getElementById('dfjBox').innerHTML=`<div class="dfj-empty">独飞精格式仅适用于 3 位玩法（福彩3D / 排列三）；当前为 ${g().name}（${npos} 位），请切换至 3 位玩法查看。</div>`;
+    document.getElementById('dfjNote').innerHTML='排列五为 5 位玩法，「独/飞/精/直/对」概念按师傅格式主要服务于 3 位组选号码生成。';
+    return;
+  }
+  const hotSet=new Set(r.du);
+  const coldSet=new Set([]);          // 此处暂未引入冷号到飞/精
+  const duPair=v=>`<span class="pair ${hotSet.has(v)?'hot':''}">${v}</span>`;
+  const siDigits=r.si.map(v=>`<span class="num ${hotSet.has(v)?'hot':''}">${v}</span>`).join(' ');
+  const wuDigits=r.wu.map(v=>`<span class="num ${hotSet.has(v)?'hot':''}">${v}</span>`).join(' ');
+  const liuDigits=r.liu.map(v=>`<span class="num ${hotSet.has(v)?'hot':''}">${v}</span>`).join(' ');
+  const anchorStr=r.anchors.length? `<span class="anchor">《<b>${r.anchors.join(' ')}</b>》</span>`:'';
+  const zhiHtml=r.zhi.map(n=>`<span class="n">${n}</span>`).join('');
+  const duiHtml=r.dui.map(n=>`<span class="n">${n}</span>`).join('');
+  const html=`
+    <div class="dfj-head">
+      <span class="ttl">${g().name}</span>
+      <span class="date">${dateStr}</span>
+      <span class="legend">窗口：${WIN_LABEL[state.win]} · 独=胆码 · 飞=两码 · 精=精选 · 直=组六 · 对=对子</span>
+    </div>
+    <div class="dfj-row"><span class="lbl">独</span><span class="v">${duPair(r.du[0])}${duPair(r.du[1])}</span></div>
+    <div class="dfj-row"><span class="lbl">飞</span><span class="v">${r.fei.map(p=>`<span class="pair ${hotSet.has(+p[0])&&hotSet.has(+p[1])?'hot':''}">${p}</span>`).join('')}</span></div>
+    <div class="dfj-row"><span class="lbl">精</span><span class="v">${r.jing.map(n=>`<span class="num">${n}</span>`).join('')}</span></div>
+    <div class="dfj-row"><span class="lbl">四</span><span class="v"><span class="set">${siDigits.replace(/ /g,' ')}</span></span></div>
+    <div class="dfj-row"><span class="lbl">五</span><span class="v"><span class="set">${wuDigits.replace(/ /g,' ')}</span></span></div>
+    <div class="dfj-row"><span class="lbl">六</span><span class="v"><span class="set">${liuDigits.replace(/ /g,' ')}</span></span></div>
+    <div class="dfj-sub"><span class="lbl2">直</span>${anchorStr}<span class="dfj-tag">组六（三不同）· 共 ${r.zhi.length} 注</span></div>
+    <div class="dfj-numrow">${zhiHtml}</div>
+    <div class="dfj-sub"><span class="lbl2">对</span>${anchorStr}<span class="dfj-tag">组三（含对子）· 共 ${r.dui.length} 注</span></div>
+    <div class="dfj-numrow">${duiHtml}</div>
+  `;
+  document.getElementById('dfjBox').innerHTML=html;
+  document.getElementById('dfjNote').innerHTML=`<b>说明</b>：「独」=胆码（窗口频次 Top2，最可能开出）；「飞」=两码组合（独∪独 / 独∪support / support∪support）；「精」=精选 3 位数（独[0]+飞数字两两配对）；「四/五/六」=号码池长度递增；「直」=组六候选（${r.zhi.length} 注，<b>三不同</b>）；「对」=组三候选（${r.dui.length} 注，<b>含对子</b>）。锚定期号《${r.anchors.join(' ')}》为最近 2 期开奖，仅供参考。仅供娱乐参考，不保证中奖。`;
+}
+
 /* ---------- 交互 ---------- */
 function buildTabs(){
   document.getElementById('tabs').innerHTML=Object.keys(GAMES).map(k=>
@@ -556,13 +685,13 @@ function buildWinSel(){
     const b=document.createElement('button');
     b.className='wbtn'+(w===state.win?' active':'');
     b.textContent=WIN_LABEL[w];
-    b.onclick=()=>{ state.win=w; buildWinSel(); renderCards(); renderPositions(); renderCombo(); renderPred(); renderFive(); };
+    b.onclick=()=>{ state.win=w; buildWinSel(); renderCards(); renderPositions(); renderCombo(); renderPred(); renderFive(); renderDFJ(); };
     el.appendChild(b);
   });
 }
 function renderAll(){
   buildTabs(); buildWinSel();
-  renderCards(); renderPositions(); renderCombo(); renderPred(); renderFive();
+  renderCards(); renderPositions(); renderCombo(); renderPred(); renderFive(); renderDFJ();
   const a=allData();
   const extra = localCachedCount>0 ? `（含本地补充 ${localCachedCount} 条，已自动载入历史数据）` : '';
   document.getElementById('status').textContent=`已加载 ${g().name}：${a[0].code}(${a[0].day}) ~ ${a[a.length-1].code}(${a[a.length-1].day})，共 ${a.length} 期。点击右上角可刷新最新开奖。${extra}`;
@@ -618,7 +747,7 @@ document.getElementById('autoBtn').onclick=()=>setAuto(!state.auto);
 
 /* ---------- 推算下一期按钮 ---------- */
 function calcNext(){
-  renderCards(); renderPred(); renderFive();
+  renderCards(); renderPred(); renderFive(); renderDFJ();
   const sec=document.getElementById('predSection');
   if(sec){
     sec.scrollIntoView({behavior:'smooth',block:'start'});
