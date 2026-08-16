@@ -587,6 +587,10 @@ function duFeiJing(){
   // supports = 第3、4 热号
   const supports=[hot[2],hot[3]];
   const feiDigits=[...new Set([...du, ...supports])];   // 飞涉及的数字 = 独 ∪ supports
+  // 上一期开奖（用于排除直/对回声）
+  const last=win[win.length-1].d;
+  const lastKey=last.join('');
+  const lastSorted=last.slice().sort((a,b)=>a-b).join('');
   // 飞 (两码) = 3 two-digit pairs：独∪独 / 独∪support / support∪support
   const pair=(a,b)=>[a,b].sort((x,y)=>x-y).join('');
   const fei=[
@@ -601,29 +605,40 @@ function duFeiJing(){
       jing.push([du[0],feiDigits[i],feiDigits[j]].join(''));
     }
   }
-  // 四/五/六：四码=独+supports，五码=四+top-2 冷，六码=五+top-3 冷
-  const si=[...du, ...supports].slice(0,4);
-  const wu=[...si, ...cold.slice(0,2)].slice(0,5);
-  const liu=[...wu, ...cold.slice(0,3)].slice(0,6);
-  // 直 (组六 10 注)：从六码枚举 C(6,3)=20，按「含独[0]+含独[1]」权重排前 10
-  const sixCands=[];
+  // 四/五/六：四码=独+supports，五码=四+top-2 冷，六码=五+top-3 冷（去重保唯一）
+  const si=[...new Set([...du, ...supports])].slice(0,4);
+  const wu=[...new Set([...si, ...cold])].slice(0,5);
+  const liu=[...new Set([...wu, ...cold])].slice(0,6);
+  // 直 (组六 10 注)：从六码去重后枚举 C(N,3)，按「含独[0]+含独[1]」权重排前 10
+  const sixSeen=new Set(), sixCands=[];
   for(let i=0;i<liu.length;i++)
     for(let j=i+1;j<liu.length;j++)
-      for(let k=j+1;k<liu.length;k++)
+      for(let k=j+1;k<liu.length;k++){
+        const key=[liu[i],liu[j],liu[k]].sort((a,b)=>a-b).join('-');
+        if(sixSeen.has(key)) continue;
+        sixSeen.add(key);
         sixCands.push([liu[i],liu[j],liu[k]]);
+      }
   sixCands.sort((a,b)=>{
     const sa=(a.includes(du[0])?2:0)+(a.includes(du[1])?1:0);
     const sb=(b.includes(du[0])?2:0)+(b.includes(du[1])?1:0);
     return sb-sa;
   });
-  const zhi=sixCands.slice(0,10).map(a=>a.join(''));
-  // 对 (组三 10 注)：独∪supports 中两两形成「a,a,b」组三
+  // 过滤掉与上一期完全相同的 组六（任一排列相同即排除）
+  const filtered=sixCands.filter(a=>a.slice().sort((x,y)=>x-y).join('')!==lastSorted);
+  const zhi=filtered.slice(0,10).map(a=>a.join(''));
+  // 对 (组三 10 注)：独∪supports 中两两形成「a,a,b」组三（去重 + 排除上一期回声）
   const duiSet=new Set(), duiList=[];
   for(let i=0;i<feiDigits.length;i++){
     for(let j=0;j<feiDigits.length;j++){
       if(i===j) continue;
-      const num=[feiDigits[i],feiDigits[i],feiDigits[j]].join('');
-      if(!duiSet.has(num)){ duiSet.add(num); duiList.push(num); }
+      const triple=[feiDigits[i],feiDigits[i],feiDigits[j]];
+      const num=triple.join('');
+      const sorted=triple.slice().sort((a,b)=>a-b).join('');
+      if(duiSet.has(sorted)) continue;
+      if(num===lastKey || sorted===lastSorted) continue;
+      duiSet.add(sorted);
+      duiList.push(num);
     }
   }
   const dui=duiList.slice(0,10);
