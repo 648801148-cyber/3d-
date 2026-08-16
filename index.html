@@ -370,7 +370,7 @@ function predict(){
   const latest=win[win.length-1].d;
   const neighbor=pos.map((_,pi)=>{
     const v=latest[pi], set=[];
-    for(const off of [0,-1,1,-2,2]){const x=((v+off)%10+10)%10; if(!set.includes(x))set.push(x);}
+    for(const off of [-1,1,-2,2]){const x=((v+off)%10+10)%10; if(!set.includes(x))set.push(x);}
     return set.slice(0,3);
   });
   const mean=pos.map((_,pi)=>{
@@ -378,16 +378,20 @@ function predict(){
     return [...Array(10).keys()].sort((a,b)=>Math.abs(a-avg)-Math.abs(b-avg)).slice(0,3);
   });
   const methods=[hot,cold,neighbor,mean];
-  const K = 10;
   const combos=[], seen=new Set();
-  for(let k=0;k<K;k++){
+  const latestKey=latest.join('');
+  let att=0;
+  while(combos.length<10 && att<300){
     const combo=[];
     for(let pi=0;pi<npos;pi++){
-      const m=methods[k%4][pi];
-      combo.push(m[k%m.length]);
+      const m=methods[att%4][pi];
+      combo.push(m[att%m.length]);
     }
+    att++;
     const key=combo.join('');
-    if(!seen.has(key)){ seen.add(key); combos.push(combo); }
+    if(key===latestKey) continue;          // 不选上一期本身
+    if(seen.has(key)) continue;
+    seen.add(key); combos.push(combo);
   }
   return {hot,cold,neighbor,mean,combos,latest,latestCode:win[win.length-1].code};
 }
