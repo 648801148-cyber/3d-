@@ -378,15 +378,16 @@ function predict(){
     return [...Array(10).keys()].sort((a,b)=>Math.abs(a-avg)-Math.abs(b-avg)).slice(0,3);
   });
   const methods=[hot,cold,neighbor,mean];
-  const K = npos<=3?6:4;
-  const combos=[];
+  const K = 10;
+  const combos=[], seen=new Set();
   for(let k=0;k<K;k++){
     const combo=[];
     for(let pi=0;pi<npos;pi++){
       const m=methods[k%4][pi];
       combo.push(m[k%m.length]);
     }
-    combos.push(combo);
+    const key=combo.join('');
+    if(!seen.has(key)){ seen.add(key); combos.push(combo); }
   }
   return {hot,cold,neighbor,mean,combos,latest,latestCode:win[win.length-1].code};
 }
