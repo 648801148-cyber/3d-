@@ -513,20 +513,25 @@ function refCombos(){
   const label = pick==='hot'?'全热五码' : pick==='cold'?'全冷五码':'冷热搭配五码';
   const hotSet=new Set(B.filter(x=>hot.includes(x)));
   const coldSet=new Set(B.filter(x=>cold.includes(x)));
+  // 上一期开奖（用于排除回声：刚开出的号码不再列入参考组合）
+  const win=winData();
+  const ldSorted = win.length? win[win.length-1].d.slice().sort((a,b)=>a-b).join('') : null;
+  const excl = c => ldSorted && c.slice().sort((a,b)=>a-b).join('')===ldSorted;
   // 组六：从 5 码任取 3 个不同 → C(5,3)=10（组选，覆盖 6 个直选排列）
   const z6=[];
   for(let i=0;i<B.length;i++)
     for(let j=i+1;j<B.length;j++)
-      for(let k=j+1;k<B.length;k++)
-        z6.push([B[i],B[j],B[k]]);
+      for(let k=j+1;k<B.length;k++){
+        const c=[B[i],B[j],B[k]]; if(!excl(c)) z6.push(c);
+      }
   // 组三：选 1 码重复 + 1 不同码 → 5×4=20（组选，覆盖 3 个直选排列）
   const z3=[];
   for(let i=0;i<B.length;i++)
     for(let j=0;j<B.length;j++){
       if(i===j) continue;
-      z3.push([B[i],B[i],B[j]]);
+      const c=[B[i],B[i],B[j]]; if(!excl(c)) z3.push(c);
     }
-  return {group:B, z6, z3, hotSet, coldSet, pick, label};
+  return {group:B, z6, z3, hotSet, coldSet, pick, label, lastExcluded: ldSorted};
 }
 function renderFive(){
   const s=fiveSets();
@@ -581,7 +586,7 @@ function renderFive(){
       <div style="display:flex;flex-wrap:wrap;gap:6px">${z6Html}</div>
       <div style="margin:12px 0 3px;font-size:12px;color:var(--sub)">组三（两同一异）· 共 <b>${rc.z3.length}</b> 注，每注覆盖 3 个直选排列</div>
       <div style="display:flex;flex-wrap:wrap;gap:6px">${z3Html}</div>
-      <div class="note" style="margin-top:8px">以上由「${rc.label}（${rc.group.join('、')}）」排列组合得出：任取 3 个不同号得<b>组六</b>，取 1 码重复 + 1 不同号得<b>组三</b>。<b style="color:var(--hot)">红=热号</b>，<b style="color:var(--cold)">蓝=冷号</b>。若当期开奖 3 个号码<b>全部落在上述 5 码内</b>，即中对应组选。跟随顶部「策略」切换可换用 全热 / 冷热搭配 / 全冷 三种思路。仅供娱乐参考，不保证中奖。</div>
+      <div class="note" style="margin-top:8px">以上由「${rc.label}（${rc.group.join('、')}）」排列组合得出：任取 3 个不同号得<b>组六</b>，取 1 码重复 + 1 不同号得<b>组三</b>。<b style="color:var(--hot)">红=热号</b>，<b style="color:var(--cold)">蓝=冷号</b>。若当期开奖 3 个号码<b>全部落在上述 5 码内</b>，即中对应组选。跟随顶部「策略」切换可换用 全热 / 冷热搭配 / 全冷 三种思路。<b style="color:var(--red)">已自动剔除上一期开奖号码（回声排除），避免出现刚开出的组合。</b>仅供娱乐参考，不保证中奖。</div>
     </div>`;
   } else {
     refHtml=`<div class="block" style="margin-top:12px"><div class="note">参考组合仅适用于 3 位玩法（福彩3D / 排列三）；排列五为 5 位玩法，不参与此项推算。</div></div>`;
@@ -689,6 +694,8 @@ function smartPick(){
   const recForm = sp.a3>=sp.a6 ? '三':'六';
   const {hot,cold}=fiveSets();
   const hotSet=tp.hotSet, coldSet=tp.coldSet;
+  // 上一期开奖（回声排除：推荐号码不直接复刻刚开出的组合）
+  const ld = win.length ? {key:win[win.length-1].d.join(''), sorted:win[win.length-1].d.slice().sort((a,b)=>a-b).join('')} : {key:null, sorted:null};
   // 该形态对应的号码池
   const pool = shape==='hot' ? [...hot].slice(0,6)
              : shape==='cold'? [...cold].slice(0,6)
@@ -702,6 +709,14 @@ function smartPick(){
   const straightOf=()=>{
     const s=[];
     for(let pi=0;pi<npos;pi++){ const f=freqAt(pi,win); s.push([...Array(10).keys()].sort((x,y)=>f[y]-f[x])[0]); }
+    // 回声排除：若直选参考恰等于上一期，则在末位改取次高频
+    if(ld.key && s.join('')===ld.key){
+      for(let pi=npos-1;pi>=0;pi--){
+        const f=freqAt(pi,win);
+        const idx=[...Array(10).keys()].sort((x,y)=>f[y]-f[x]);
+        if(idx[1]!==undefined && idx[1]!==s[pi]){ s[pi]=idx[1]; break; }
+      }
+    }
     return {straight:s, prob:s.reduce((m,v,pi)=>m*freqAt(pi,win)[v]/win.length,1)};
   };
   let digits, groupProb, formLabel, digitsHtml;
@@ -713,13 +728,21 @@ function smartPick(){
     return {tp,shape,sp,recForm,is3,formLabel,digits,digitsHtml,straight:st.straight,straightProb:st.prob,groupProb:null,rankPool,hotSet,coldSet};
   }
   if(recForm==='六'){
-    const top3=rankPool.slice(0,3);
+    let top3=rankPool.slice(0,3);
+    // 回声排除：若首选三码恰等于上一期（组六），则换入次高频第三码
+    if(ld.sorted && top3.slice().sort((a,b)=>a-b).join('')===ld.sorted && rankPool[3]!==undefined) top3=[rankPool[0],rankPool[1],rankPool[3]];
     digits=top3;
     groupProb = 6*p(top3[0])*p(top3[1])*p(top3[2]);
     formLabel='组六（三不同）';
     digitsHtml=top3.map(chip).join('');
   } else {
-    const a=rankPool[0], b=rankPool.find(x=>x!==a);
+    let a=rankPool[0], b=rankPool.find(x=>x!==a);
+    // 回声排除：若首选「两同一异」恰等于上一期（组三），则换不同码或换胆码
+    if(ld.sorted && [a,a,b].slice().sort((x,y)=>x-y).join('')===ld.sorted){
+      const b2=rankPool.find(x=>x!==a && x!==b);
+      if(b2!==undefined) b=b2;
+      else { a=rankPool[1]; b=rankPool.find(x=>x!==a); }
+    }
     digits=[a,a,b];
     groupProb = 3*p(a)*p(a)*p(b);
     formLabel='组三（两同一异）';
@@ -775,7 +798,7 @@ function renderSmart(){
     ${tbl}
     <div class="note" style="margin-top:6px">基础概率按所选窗口统计；<b>修正</b>基于全量历史的「出现间隔」与「当前遗漏」做均值回归——稀少形态（全热/全冷）遗漏越久、越偏离平均间隔，下一期概率越高（"到期"）；刚出现则概率略降${dueTxt}。</div>
   </div>${recHtml}`;
-  const note=`<b>逻辑说明</b>：① 按「全热 / 冷热搭配 / 全冷」三形态统计窗口基础概率，并用全量历史的<b>间隔与遗漏</b>做均值回归修正，得修正后概率，<b>概率最高者当选推荐形态</b>（顶部「策略」可手动锁定某一形态）；② 在该形态号码范围内，再用<b>组三/组六连态修正</b>选具体形式；③ 用<b>窗口频率最大化</b>挑出具体数字（全热→热号池 / 全冷→冷号池 / 冷热搭配→混合池）。所有概率均为频率模型估算，3 位直选真实命中恒为 1/1000，本方案不提高中奖概率，仅供娱乐参考。`;
+  const note=`<b>逻辑说明</b>：① 按「全热 / 冷热搭配 / 全冷」三形态统计窗口基础概率，并用全量历史的<b>间隔与遗漏</b>做均值回归修正，得修正后概率，<b>概率最高者当选推荐形态</b>（顶部「策略」可手动锁定某一形态）；② 在该形态号码范围内，再用<b>组三/组六连态修正</b>选具体形式；③ 用<b>窗口频率最大化</b>挑出具体数字（全热→热号池 / 全冷→冷号池 / 冷热搭配→混合池）。所有概率均为频率模型估算，3 位直选真实命中恒为 1/1000，本方案不提高中奖概率，仅供娱乐参考。<b style="color:var(--red)">为避免复刻刚开出的号码，推荐组选与直选参考均已自动排除上一期开奖（回声排除）。</b>`;
   document.getElementById('smartBox').innerHTML=html;
   document.getElementById('smartNote').innerHTML=note;
 }
@@ -822,10 +845,14 @@ function duFeiJing(mode){
     for(let b=a+1;b<jingRest.length;b++)
       sixJ.push([du[0],jingRest[a],jingRest[b]].join(''));
   const threeJ=jingRest.map(x=>[du[0],du[0],x].join(''));   // 组三（两同）：du[0] 重复 + 一不同
+  // 回声排除：剔除与上一期完全相同的号码（刚开出的不再推荐）
+  const exclJ = n => n===lastKey || n.split('').sort((a,b)=>a-b).join('')===lastSorted;
+  const sixJf = sixJ.filter(n=>!exclJ(n));
+  const threeJf = threeJ.filter(n=>!exclJ(n));
   const jing=[];
   const TOTAL=7, nSix=Math.round(TOTAL*4/7), nThree=TOTAL-nSix;   // 4 组六 + 3 组三
-  for(let i=0;i<nSix && i<sixJ.length;i++) jing.push(sixJ[i]);
-  for(let i=0;i<nThree && i<threeJ.length;i++) jing.push(threeJ[i]);
+  for(let i=0;i<nSix && i<sixJf.length;i++) jing.push(sixJf[i]);
+  for(let i=0;i<nThree && i<threeJf.length;i++) jing.push(threeJf[i]);
   // 四/五/六：均在本策略 6 码池内（去重保唯一）
   const si=[...new Set([...du, ...supports])].slice(0,4);
   const wu=[...new Set([...si, ...pool])].slice(0,5);
@@ -914,7 +941,7 @@ function renderDFJ(){
     <div class="dfj-numrow dfj-pred">${predCombosHtml}</div>
   `;
   document.getElementById('dfjBox').innerHTML=html;
-  document.getElementById('dfjNote').innerHTML=`<b>说明</b>：当前策略 <b>${r.pickLabel}</b>。「独」=胆码（按策略取 Top2：${r.du.join('、')}）；「飞」=两码组合；「精」=精选 7 注（均含胆码 du[0]，按 组六:组三=4:3 自然比例：4 注组六 + 3 注组三）；「四/五/六」=号码池长度递增；「直」=组六候选（${r.zhi.length} 注，<b>三不同</b>）；「对」=组三候选（${r.dui.length} 注，<b>含对子</b>）。<b style="color:var(--hot)">红=热号</b>，<b style="color:var(--cold)">蓝=冷号</b>。锚定期号《${r.anchors.join(' ')}》为最近 2 期开奖。「下一期推测」= 由 热号/冷号/邻号/均值 四类思路轮换合成 ${pr.combos.length} 注直选参考（已排除上一期本身）。仅供娱乐参考，不保证中奖。`;
+  document.getElementById('dfjNote').innerHTML=`<b>说明</b>：当前策略 <b>${r.pickLabel}</b>。「独」=胆码（按策略取 Top2：${r.du.join('、')}）；「飞」=两码组合；「精」=精选 7 注（均含胆码 du[0]，按 组六:组三=4:3 自然比例：4 注组六 + 3 注组三）；「四/五/六」=号码池长度递增；「直」=组六候选（${r.zhi.length} 注，<b>三不同</b>）；「对」=组三候选（${r.dui.length} 注，<b>含对子</b>）。<b style="color:var(--hot)">红=热号</b>，<b style="color:var(--cold)">蓝=冷号</b>。锚定期号《${r.anchors.join(' ')}》为最近 2 期开奖。<b style="color:var(--red)">「精 / 直 / 对」均已自动剔除上一期开奖号码（回声排除），避免出现刚开出的组合。</b>「下一期推测」= 由 热号/冷号/邻号/均值 四类思路轮换合成 ${pr.combos.length} 注直选参考（已排除上一期本身）。仅供娱乐参考，不保证中奖。`;
 }
 
 /* ---------- 交互 ---------- */
