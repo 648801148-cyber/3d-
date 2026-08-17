@@ -31,7 +31,8 @@ header .sub{color:var(--sub);font-size:12px}
 .tabs{display:flex;gap:6px;flex-wrap:wrap}
 .tab{padding:8px 14px;border-radius:20px;border:1px solid var(--line);background:var(--card);cursor:pointer;font-size:13px;color:var(--sub)}
 .tab.active{background:var(--blue);color:#fff;border-color:var(--blue)}
-.win-sel{margin-left:auto;display:flex;gap:4px;align-items:center}
+.win-sel{display:flex;gap:4px;align-items:center}
+#winSel{margin-left:auto}
 .win-sel span{color:var(--sub);font-size:12px}
 .wbtn{padding:6px 10px;border-radius:8px;border:1px solid var(--line);background:var(--card);cursor:pointer;font-size:12px;color:var(--sub)}
 .wbtn.active{background:var(--blue);color:#fff;border-color:var(--blue)}
@@ -141,6 +142,9 @@ footer{margin-top:24px;font-size:11.5px;color:var(--sub);line-height:1.7;border-
     <div class="win-sel" id="winSel">
       <span>样本窗口</span>
     </div>
+    <div class="win-sel" id="pickSel">
+      <span>策略</span>
+    </div>
   </div>
   <div class="status" id="status">数据加载中…</div>
 
@@ -190,12 +194,14 @@ const GAMES = {"fcsd":{"name":"福彩3D","pos":["百","十","个"],"data":[{"cod
 
 const WIN_OPTS = [28,56,112];
 const WIN_LABEL = {28:'近28期',56:'近56期',112:'近112期'};
+const PICK_OPTS = ['hot','mix','cold'];
+const PICK_LABEL = {hot:'🔥全热', mix:'🌡️冷热搭配', cold:'❄️全冷'};
 const ODD = v=>v%2===1;
 const BIG = v=>v>=5;
 const PRIME = v=>[2,3,5,7].includes(v);
 const UA = "Mozilla/5.0";
 
-let state = { game: Object.keys(GAMES)[0], win: 56 };
+let state = { game: Object.keys(GAMES)[0], win: 56, pick: 'mix' };
 
 /* ---------- 数据访问 ---------- */
 function g(){ return GAMES[state.game]; }
@@ -468,12 +474,13 @@ function fiveSets(){
   const omit=new Array(10).fill(0), last=new Array(10).fill(-1);
   for(let i=0;i<win.length;i++){ for(const x of win[i].d) last[x]=i; }
   for(let x=0;x<10;x++) omit[x]= last[x]===-1? win.length : (win.length-1-last[x]);
-  const cold=[...Array(10).keys()].sort((a,b)=> omit[b]-omit[a] || comb[a]-comb[b]).slice(0,5);
+  const cold=[...Array(10).keys()].sort((a,b)=> omit[b]-omit[a] || comb[a]-comb[b]).slice(0,6);
   const hotSet=new Set(hot);
   const coldForB=cold.filter(x=>!hotSet.has(x)).slice(0,2);    // 取最冷的 2 个，且不与热号重复
   const groupA=hot;                                           // ① 全热五码
   const groupB=[hot[0],hot[1],hot[2],...coldForB];            // ② 冷热搭配五码 = 3热 + 2冷
-  return {hot,cold,groupA,groupB,comb,omit};
+  const groupC=cold.slice(0,5);                               // ③ 全冷五码（遗漏最大 5 个，纯冷）
+  return {hot,cold,groupA,groupB,groupC,comb,omit};
 }
 // 下一期形态概率：全热 / 冷热搭配 / 其他（基于当前窗口）
 function fiveProbs(){
@@ -490,13 +497,16 @@ function fiveProbs(){
   }
   return {allHot:allHot/N, mix:mix/N, other:other/N, N, npos};
 }
-// 参考组合：以「冷热搭配五码」为号码池，排列组合出全部 组六（三不同）与 组三（两同）号码
+// 参考组合：以所选策略的「五码」为号码池，排列组合出全部 组六（三不同）与 组三（两同）号码
 function refCombos(){
-  const {groupB,hot}=fiveSets();
+  const {groupA,groupB,groupC,hot,cold}=fiveSets();
   const npos=g().pos.length;
   if(npos!==3) return null;                 // 仅 3 位玩法（福彩3D / 排列三）
-  const hotSet=new Set(hot);
-  const B=groupB.slice();
+  const pick=state.pick;
+  const B = pick==='hot'?groupA : pick==='cold'?groupC : groupB;   // 跟随策略选择
+  const label = pick==='hot'?'全热五码' : pick==='cold'?'全冷五码':'冷热搭配五码';
+  const hotSet=new Set(B.filter(x=>hot.includes(x)));
+  const coldSet=new Set(B.filter(x=>cold.includes(x)));
   // 组六：从 5 码任取 3 个不同 → C(5,3)=10（组选，覆盖 6 个直选排列）
   const z6=[];
   for(let i=0;i<B.length;i++)
@@ -510,7 +520,7 @@ function refCombos(){
       if(i===j) continue;
       z3.push([B[i],B[i],B[j]]);
     }
-  return {groupB:B, z6, z3, hotSet};
+  return {group:B, z6, z3, hotSet, coldSet, pick, label};
 }
 function renderFive(){
   const s=fiveSets();
@@ -518,6 +528,7 @@ function renderFive(){
   const chip=(v,kind)=>`<span class="chip ${kind}" style="font-size:17px;font-weight:700;min-width:30px;text-align:center">${v}</span>`;
   const chipsA=s.groupA.map(v=>chip(v,'hot')).join('');
   const chipsB=s.groupB.map(v=>chip(v, s.hot.includes(v)?'hot':'cold')).join('');
+  const chipsC=s.groupC.map(v=>chip(v,'cold')).join('');
   const pr=fiveProbs();
   const pct=n=>(n*100).toFixed(1)+'%';
   // 全热 / 冷热搭配 / 其他 概率面板（用户要求的"更精准推测"依据）
@@ -554,17 +565,17 @@ function renderFive(){
   let refHtml;
   const rc=refCombos();
   if(rc){
-    const c2=v=>`<span class="chip ${rc.hotSet.has(v)?'hot':'cold'}" style="font-size:13px;font-weight:700;min-width:20px;text-align:center">${v}</span>`;
+    const c2=v=>`<span class="chip ${rc.hotSet.has(v)?'hot':(rc.coldSet.has(v)?'cold':'')}" style="font-size:13px;font-weight:700;min-width:20px;text-align:center">${v}</span>`;
     const item=d=>`<div style="display:inline-flex;align-items:center;gap:2px;padding:3px 6px;border:0.5px solid var(--line);border-radius:7px;background:#fff">${d.map(c2).join('')}</div>`;
     const z6Html=rc.z6.map(item).join('');
     const z3Html=rc.z3.map(item).join('');
     refHtml=`<div class="block" style="margin-top:12px">
-      <div class="t">参考组合 · 冷热搭配五码 全组选覆盖（号码池：${rc.groupB.join('、')}）</div>
+      <div class="t">参考组合 · ${rc.label} 全组选覆盖（号码池：${rc.group.join('、')}）</div>
       <div style="margin:6px 0 3px;font-size:12px;color:var(--sub)">组六（三不同）· 共 <b>${rc.z6.length}</b> 注，每注覆盖 6 个直选排列</div>
       <div style="display:flex;flex-wrap:wrap;gap:6px">${z6Html}</div>
       <div style="margin:12px 0 3px;font-size:12px;color:var(--sub)">组三（两同一异）· 共 <b>${rc.z3.length}</b> 注，每注覆盖 3 个直选排列</div>
       <div style="display:flex;flex-wrap:wrap;gap:6px">${z3Html}</div>
-      <div class="note" style="margin-top:8px">以上由「冷热搭配五码（3 热 + 2 冷）」排列组合得出：任取 3 个不同号得<b>组六</b>，取 1 码重复 + 1 不同号得<b>组三</b>。<b style="color:var(--hot)">红=热号</b>，<b style="color:var(--cold)">蓝=冷号</b>。若当期开奖 3 个号码<b>全部落在上述 5 码内</b>，即中对应组选。仅供娱乐参考，不保证中奖。</div>
+      <div class="note" style="margin-top:8px">以上由「${rc.label}（${rc.group.join('、')}）」排列组合得出：任取 3 个不同号得<b>组六</b>，取 1 码重复 + 1 不同号得<b>组三</b>。<b style="color:var(--hot)">红=热号</b>，<b style="color:var(--cold)">蓝=冷号</b>。若当期开奖 3 个号码<b>全部落在上述 5 码内</b>，即中对应组选。跟随顶部「策略」切换可换用 全热 / 冷热搭配 / 全冷 三种思路。仅供娱乐参考，不保证中奖。</div>
     </div>`;
   } else {
     refHtml=`<div class="block" style="margin-top:12px"><div class="note">参考组合仅适用于 3 位玩法（福彩3D / 排列三）；排列五为 5 位玩法，不参与此项推算。</div></div>`;
@@ -572,7 +583,8 @@ function renderFive(){
   document.getElementById('fiveBox').innerHTML=`<div class="pred" style="grid-column:1/-1">
     <h3 style="margin:0 0 8px;font-size:15px">${is3?'五选三 · 组选复试（两组号码）':'五码热号池（两组参考）'}</h3>
     <div style="margin-bottom:10px"><div class="note" style="margin-bottom:6px">① 全热五码（近期最热 5 个）</div><div class="chip-row" style="gap:6px">${chipsA}</div></div>
-    <div><div class="note" style="margin-bottom:6px">② 冷热搭配五码（3 热 + 2 冷，冷号取当前遗漏最大）</div><div class="chip-row" style="gap:6px">${chipsB}</div></div>
+    <div style="margin-bottom:10px"><div class="note" style="margin-bottom:6px">② 冷热搭配五码（3 热 + 2 冷，冷号取当前遗漏最大）</div><div class="chip-row" style="gap:6px">${chipsB}</div></div>
+    <div><div class="note" style="margin-bottom:6px">③ 全冷五码（当前遗漏最大 5 个，纯冷号）</div><div class="chip-row" style="gap:6px">${chipsC}</div></div>
     ${probHtml}${refHtml}${shapeHtml}</div>`;
   let note;
   if(is3){
@@ -584,16 +596,28 @@ function renderFive(){
 }
 
 /* ---------- 独飞精 · 胆码推荐（师傅格式） ---------- */
-function duFeiJing(){
+function duFeiJing(mode){
+  mode = mode || state.pick;
   const win=winData();
   const npos=g().pos.length;
   if(npos!==3) return null;                  // 仅 3 位玩法（福彩3D / 排列三）
-  const {hot,cold,groupA,groupB}=fiveSets();
-  // 独 (胆码) = 窗口频次 Top2（最可能开出）
-  const du=[hot[0],hot[1]];
-  // supports = 第3、4 热号
-  const supports=[hot[2],hot[3]];
-  const feiDigits=[...new Set([...du, ...supports])];   // 飞涉及的数字 = 独 ∪ supports
+  const {hot,cold}=fiveSets();
+  // 按策略确定：胆码 独、支撑、候选池（全部落在同一策略内，保证「全冷」纯冷）
+  let du, supports, pool, pickLabel;
+  if(mode==='cold'){
+    du=[cold[0],cold[1]]; supports=[cold[2],cold[3]];     // 全冷：胆码取最冷 2 个
+    pool=[...cold].slice(0,6);                            // 6 个最冷号
+    pickLabel='❄️全冷';
+  } else if(mode==='mix'){
+    du=[hot[0],cold[0]]; supports=[hot[1],cold[1]];       // 冷热搭配：胆码 1热1冷
+    pool=[hot[0],hot[1],hot[2],cold[0],cold[1],cold[2]];  // 3热 + 3冷
+    pickLabel='🌡️冷热搭配';
+  } else {
+    du=[hot[0],hot[1]]; supports=[hot[2],hot[3]];         // 全热：胆码取最热 2 个
+    pool=[...hot].slice(0,6);                             // 6 个最热号
+    pickLabel='🔥全热';
+  }
+  const feiDigits=[...new Set([...du, ...supports])];     // 飞涉及的数字 = 独 ∪ supports
   // 上一期开奖（用于排除直/对回声）
   const last=win[win.length-1].d;
   const lastKey=last.join('');
@@ -605,9 +629,8 @@ function duFeiJing(){
     pair(du[0],supports[0]),
     pair(supports[0],supports[1])
   ];
-  // 精 (精选)：按「组三:组六 = 3:4」的自然比例混合（组选池 90 组三 / 120 组六 ≈ 3:4）
-  // 候选池 = 独 ∪ supports ∪ 两个最冷，保证足量候选；所有精均含胆码 du[0]
-  const jingPool=[...new Set([...du, ...supports, ...cold.slice(0,2)])];
+  // 精 (精选)：按「组三:组六 = 3:4」的自然比例混合；候选池 = 本策略 6 码；所有精均含胆码 du[0]
+  const jingPool=[...new Set(pool)];
   const jingRest=jingPool.filter(x=>x!==du[0]);
   const sixJ=[];                                   // 组六（三不同）：du[0] + 任取两不同
   for(let a=0;a<jingRest.length;a++)
@@ -618,10 +641,10 @@ function duFeiJing(){
   const TOTAL=7, nSix=Math.round(TOTAL*4/7), nThree=TOTAL-nSix;   // 4 组六 + 3 组三
   for(let i=0;i<nSix && i<sixJ.length;i++) jing.push(sixJ[i]);
   for(let i=0;i<nThree && i<threeJ.length;i++) jing.push(threeJ[i]);
-  // 四/五/六：四码=独+supports，五码=四+top-2 冷，六码=五+top-3 冷（去重保唯一）
+  // 四/五/六：均在本策略 6 码池内（去重保唯一）
   const si=[...new Set([...du, ...supports])].slice(0,4);
-  const wu=[...new Set([...si, ...cold])].slice(0,5);
-  const liu=[...new Set([...wu, ...cold])].slice(0,6);
+  const wu=[...new Set([...si, ...pool])].slice(0,5);
+  const liu=[...new Set([...wu, ...pool])].slice(0,6);
   // 直 (组六 10 注)：从六码去重后枚举 C(N,3)，按「含独[0]+含独[1]」权重排前 10
   const sixSeen=new Set(), sixCands=[];
   for(let i=0;i<liu.length;i++)
@@ -658,7 +681,8 @@ function duFeiJing(){
   // 直/对的「锚定」参照 = 最近 2 期开奖（用作《》括号内的参考期号）
   const last2 = win.slice(-2);
   const anchors = [last2[last2.length-2]?.code, last2[last2.length-1]?.code].filter(Boolean);
-  return {du, fei, jing, si, wu, liu, zhi, dui, anchors};
+  const hotSet=new Set(hot), coldSet=new Set(cold);
+  return {du, fei, jing, si, wu, liu, zhi, dui, anchors, hotSet, coldSet, pickLabel, mode};
 }
 function renderDFJ(){
   const r=duFeiJing();
@@ -670,12 +694,12 @@ function renderDFJ(){
     document.getElementById('dfjNote').innerHTML='排列五为 5 位玩法，「独/飞/精/直/对」概念按师傅格式主要服务于 3 位组选号码生成。';
     return;
   }
-  const hotSet=new Set(r.du);
-  const coldSet=new Set([]);          // 此处暂未引入冷号到飞/精
-  const duPair=v=>`<span class="pair ${hotSet.has(v)?'hot':''}">${v}</span>`;
-  const siDigits=r.si.map(v=>`<span class="num ${hotSet.has(v)?'hot':''}">${v}</span>`).join(' ');
-  const wuDigits=r.wu.map(v=>`<span class="num ${hotSet.has(v)?'hot':''}">${v}</span>`).join(' ');
-  const liuDigits=r.liu.map(v=>`<span class="num ${hotSet.has(v)?'hot':''}">${v}</span>`).join(' ');
+  const hotSet=r.hotSet, coldSet=r.coldSet;          // 全局热/冷集合，用于给每个数字上色
+  const numCls=v=> hotSet.has(v)?'hot':(coldSet.has(v)?'cold':'');
+  const duPair=v=>`<span class="pair ${numCls(v)}">${v}</span>`;
+  const siDigits=r.si.map(v=>`<span class="num ${numCls(v)}">${v}</span>`).join(' ');
+  const wuDigits=r.wu.map(v=>`<span class="num ${numCls(v)}">${v}</span>`).join(' ');
+  const liuDigits=r.liu.map(v=>`<span class="num ${numCls(v)}">${v}</span>`).join(' ');
   const anchorStr=r.anchors.length? `<span class="anchor">《<b>${r.anchors.join(' ')}</b>》</span>`:'';
   const zhiHtml=r.zhi.map(n=>`<span class="n">${n}</span>`).join('');
   const duiHtml=r.dui.map(n=>`<span class="n">${n}</span>`).join('');
@@ -687,10 +711,10 @@ function renderDFJ(){
     <div class="dfj-head">
       <span class="ttl">${g().name}</span>
       <span class="date">${dateStr}</span>
-      <span class="legend">窗口：${WIN_LABEL[state.win]} · 独=胆码 · 飞=两码 · 精=精选 · 直=组六 · 对=对子</span>
+      <span class="legend">策略：${r.pickLabel} · 窗口：${WIN_LABEL[state.win]} · 独=胆码 · 飞=两码 · 精=精选 · 直=组六 · 对=对子</span>
     </div>
     <div class="dfj-row"><span class="lbl">独</span><span class="v">${duPair(r.du[0])}${duPair(r.du[1])}</span></div>
-    <div class="dfj-row"><span class="lbl">飞</span><span class="v">${r.fei.map(p=>`<span class="pair ${hotSet.has(+p[0])&&hotSet.has(+p[1])?'hot':''}">${p}</span>`).join('')}</span></div>
+    <div class="dfj-row"><span class="lbl">飞</span><span class="v">${r.fei.map(p=>`<span class="pair ${p.split('').map(numCls).filter(Boolean).join(' ')}">${p}</span>`).join('')}</span></div>
     <div class="dfj-row"><span class="lbl">精</span><span class="v">${r.jing.map(n=>`<span class="num">${n}</span>`).join('')}</span></div>
     <div class="dfj-row"><span class="lbl">四</span><span class="v"><span class="set">${siDigits.replace(/ /g,' ')}</span></span></div>
     <div class="dfj-row"><span class="lbl">五</span><span class="v"><span class="set">${wuDigits.replace(/ /g,' ')}</span></span></div>
@@ -705,7 +729,7 @@ function renderDFJ(){
     <div class="dfj-numrow dfj-pred">${predCombosHtml}</div>
   `;
   document.getElementById('dfjBox').innerHTML=html;
-  document.getElementById('dfjNote').innerHTML=`<b>说明</b>：「独」=胆码（窗口频次 Top2，最可能开出）；「飞」=两码组合（独∪独 / 独∪support / support∪support）；「精」=精选 7 注（均含胆码 du[0]，按 组六:组三=4:3 自然比例：4 注组六 + 3 注组三）；「四/五/六」=号码池长度递增；「直」=组六候选（${r.zhi.length} 注，<b>三不同</b>）；「对」=组三候选（${r.dui.length} 注，<b>含对子</b>）。锚定期号《${r.anchors.join(' ')}》为最近 2 期开奖。「下一期推测」= 由 热号/冷号/邻号/均值 四类思路轮换合成 ${pr.combos.length} 注直选参考（已排除上一期本身）。仅供娱乐参考，不保证中奖。`;
+  document.getElementById('dfjNote').innerHTML=`<b>说明</b>：当前策略 <b>${r.pickLabel}</b>。「独」=胆码（按策略取 Top2：${r.du.join('、')}）；「飞」=两码组合；「精」=精选 7 注（均含胆码 du[0]，按 组六:组三=4:3 自然比例：4 注组六 + 3 注组三）；「四/五/六」=号码池长度递增；「直」=组六候选（${r.zhi.length} 注，<b>三不同</b>）；「对」=组三候选（${r.dui.length} 注，<b>含对子</b>）。<b style="color:var(--hot)">红=热号</b>，<b style="color:var(--cold)">蓝=冷号</b>。锚定期号《${r.anchors.join(' ')}》为最近 2 期开奖。「下一期推测」= 由 热号/冷号/邻号/均值 四类思路轮换合成 ${pr.combos.length} 注直选参考（已排除上一期本身）。仅供娱乐参考，不保证中奖。`;
 }
 
 /* ---------- 交互 ---------- */
@@ -725,8 +749,19 @@ function buildWinSel(){
     el.appendChild(b);
   });
 }
+function buildPickSel(){
+  const el=document.getElementById('pickSel');
+  el.querySelectorAll('.wbtn').forEach(e=>e.remove());
+  PICK_OPTS.forEach(p=>{
+    const b=document.createElement('button');
+    b.className='wbtn'+(p===state.pick?' active':'');
+    b.textContent=PICK_LABEL[p];
+    b.onclick=()=>{ state.pick=p; buildPickSel(); renderFive(); renderDFJ(); };
+    el.appendChild(b);
+  });
+}
 function renderAll(){
-  buildTabs(); buildWinSel();
+  buildTabs(); buildWinSel(); buildPickSel();
   renderCards(); renderPositions(); renderCombo(); renderPred(); renderFive(); renderDFJ();
   const a=allData();
   const extra = localCachedCount>0 ? `（含本地补充 ${localCachedCount} 条，已自动载入历史数据）` : '';
