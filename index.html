@@ -182,6 +182,12 @@ footer{margin-top:24px;font-size:11.5px;color:var(--sub);line-height:1.7;border-
     <div class="note" id="dfjNote" style="margin-top:8px"></div>
   </section>
 
+  <section>
+    <h2>🎯 智能最高概率方案（连态修正 + 频率最大化）</h2>
+    <div class="pred" id="smartBox"></div>
+    <div class="note" id="smartNote" style="margin-top:8px"></div>
+  </section>
+
   <footer>
     <div>数据来源：中彩网公开开奖接口（api.huiniao.top），抓取时间见顶部状态。本页为单文件离线应用，数据已内嵌。</div>
     <div>统计口径：频率/冷热基于所选「样本窗口」；当前遗漏与最大遗漏基于全量历史；预测综合热号追踪、冷号回补、邻号延伸、均值四类思路。</div>
@@ -595,6 +601,128 @@ function renderFive(){
   document.getElementById('fiveNote').innerHTML=note;
 }
 
+/* ---------- 智能最高概率方案：连态（组三/组六连续期数）修正 + 频率最大化 ---------- */
+function shapeType(r){
+  const [x,y,z]=r.d;
+  if(x===y&&y===z) return '豹';
+  if(x===y||y===z||x===z) return '三';
+  return '六';
+}
+const SHAPE_NAME={六:'组六',三:'组三',豹:'豹子'};
+// 组三/组六 概率随「连着好几期」的数量修正：某形态连续出现越多，下一期切到另一形态的概率越高（均值回归 / "到期" 直觉）
+function streakProbs(){
+  const win=winData(), N=win.length;
+  const types=win.map(shapeType);
+  let c6=0,c3=0,cb=0;
+  for(const t of types){ if(t==='六')c6++; else if(t==='三')c3++; else cb++; }
+  const p6=c6/N, p3=c3/N, pb=cb/N;
+  // 统计截至最新一期、连续出现的「非豹子」形态及其连期数
+  let streak=0, runType=null;
+  for(let i=win.length-1;i>=0;i--){
+    const t=types[i];
+    if(t==='豹') break;                 // 豹子极罕见，打断连态统计
+    if(runType===null) runType=t;
+    if(t!==runType) break;
+    streak++;
+  }
+  const alpha=0.18, cap=1.6;            // 修正强度 / 上限
+  const pressure = runType ? Math.min(alpha*(streak-1), cap) : 0;   // 连 1 期时 pressure=0（尚未"连着好几期"）
+  let r6=p6, r3=p3, rb=pb;
+  if(runType==='六'){ r6=p6*Math.max(1-pressure,0.2); r3=p3*(1+pressure); }   // 连续组六→组三概率上调
+  else if(runType==='三'){ r3=p3*Math.max(1-pressure,0.2); r6=p6*(1+pressure); } // 连续组三→组六概率上调
+  const sum=r6+r3+rb || 1;
+  return {p6,p3,pb,N, runType, streak, a6:r6/sum, a3:r3/sum, ab:rb/sum, pressure};
+}
+// 综合：选「连态修正后概率最高」的形态，再用窗口频率最大化选具体号码
+function smartPick(){
+  const win=winData(), npos=g().pos.length, is3=npos===3;
+  const sp=streakProbs();
+  const {hot,cold}=fiveSets();
+  const hotSet=new Set(hot), coldSet=new Set(cold);
+  // 窗口内各数字总频次（跨位置）
+  const comb=new Array(10).fill(0);
+  for(const r of win) for(const x of r.d) comb[x]++;
+  const tot=win.length*npos;
+  const p=i=>comb[i]/tot;
+  const rank=[...Array(10).keys()].sort((a,b)=>comb[b]-comb[a] || a-b);
+  const chip=v=>`<span class="chip ${hotSet.has(v)?'hot':(coldSet.has(v)?'cold':'')}" style="font-size:16px;font-weight:700;min-width:26px;text-align:center">${v}</span>`;
+  let recType, digits, groupProb, formLabel, digitsHtml;
+  if(!is3){
+    // 排列五：无组三/组六概念，直接按频率最大化给 5 码 + 最可能直选
+    digits=rank.slice(0,5);
+    recType='五码'; formLabel='五码频率最高';
+    groupProb=null;
+    digitsHtml=digits.map(chip).join('');
+    return {sp,is3,recType,formLabel,digits,groupProb,digitsHtml,comb,p,rank,hotSet,coldSet};
+  }
+  recType = sp.a3>=sp.a6 ? '三':'六';
+  if(recType==='六'){
+    const top3=rank.slice(0,3);
+    digits=top3;
+    groupProb = 6*p(top3[0])*p(top3[1])*p(top3[2]);   // 组选命中（覆盖 6 个直选排列）
+    formLabel='组六（三不同）';
+    digitsHtml=top3.map(chip).join('');
+  } else {
+    const a=rank[0];
+    const b=rank.find(x=>x!==a);
+    digits=[a,a,b];
+    groupProb = 3*p(a)*p(a)*p(b);                       // 组选命中（覆盖 3 个直选排列）
+    formLabel='组三（两同一异）';
+    digitsHtml=`${chip(a)}${chip(a)}${chip(b)}`;
+  }
+  // 直选参考：各位置频率最高的数字（乘积最大）
+  const straight=[];
+  for(let pi=0;pi<npos;pi++){
+    const f=freqAt(pi,win);
+    straight.push([...Array(10).keys()].sort((x,y)=>f[y]-f[x])[0]);
+  }
+  const straightProb = straight.reduce((m,v,pi)=>m*freqAt(pi,win)[v]/win.length,1);
+  return {sp,is3,recType,formLabel,digits,groupProb,digitsHtml,straight,straightProb,comb,p,rank,hotSet,coldSet};
+}
+function renderSmart(){
+  const r=smartPick();
+  const pct=n=>(n*100).toFixed(1)+'%';
+  let html, note;
+  if(!r.is3){
+    html=`<div class="block" style="margin-top:0">
+      <div class="t">排列五 · 频率最大化方案（无组三/组六概念）</div>
+      <div style="margin:8px 0 4px;font-size:12px;color:var(--sub)">窗口频率最高的 5 个号码</div>
+      <div class="chip-row" style="gap:6px">${r.digitsHtml}</div>
+    </div>`;
+    note=`排列五为 5 位玩法，不适用组三/组六连态修正；此处直接给出「窗口频率最高 5 码」作选号参考。仅供娱乐。`;
+    document.getElementById('smartBox').innerHTML=html;
+    document.getElementById('smartNote').innerHTML=note;
+    return;
+  }
+  const sp=r.sp;
+  const runTxt = sp.runType ? `已连续 <b>${sp.streak}</b> 期${SHAPE_NAME[sp.runType]}` : '近期无连续形态';
+  const pressureTxt = sp.pressure>0 ? `（连态修正系数 +${(sp.pressure*100).toFixed(0)}%，"${SHAPE_NAME[sp.runType]}"越连越久，另一形态概率越高）` : '（仅 1 期，未达"连着好几期"，暂不做修正）';
+  // 连态修正后的形态概率条
+  const bar=(label,val,col)=>`<div class="p" style="border-top:3px solid ${col}"><b>${pct(val)}</b>${label}</div>`;
+  const shapeHtml=`<div class="pie3">
+      ${bar('组六',sp.a6,'var(--blue)')}
+      ${bar('组三',sp.a3,'var(--red)')}
+      ${bar('豹子',sp.ab,'var(--cold)')}
+    </div>
+    <div class="note" style="margin-top:6px">基础频率（窗口 ${sp.N} 期）：组六 ${pct(sp.p6)} / 组三 ${pct(sp.p3)} / 豹子 ${pct(sp.pb)}。连态修正后：组六 ${pct(sp.a6)} / 组三 ${pct(sp.a3)}。当前${runTxt}${pressureTxt}</div>`;
+  // 推荐方案
+  const recHtml=`<div class="block" style="margin-top:12px">
+    <div class="t">🏆 推荐投注（连态修正后概率最高形态 + 频率最大化号码）</div>
+    <div style="margin:8px 0 4px;font-size:12px;color:var(--sub)">推荐形态：<b style="color:${r.recType==='六'?'var(--blue)':'var(--red)'}">${r.formLabel}</b>（连态修正后概率 ${pct(r.recType==='六'?sp.a6:sp.a3)}）</div>
+    <div style="margin:8px 0 4px;font-size:12px;color:var(--sub)">推荐号码（窗口频率最高）</div>
+    <div class="chip-row" style="gap:6px">${r.digitsHtml}</div>
+    <div style="margin:10px 0 2px;font-size:12px;color:var(--sub)">该组选命中概率（频率模型估算）：${r.groupProb!=null?('<b style="font-size:15px">'+(r.groupProb*100).toFixed(2)+'%</b>'):'—'} <span style="color:var(--sub)">（仅覆盖 6/3 个直选排列，非 1/1000 直选）</span></div>
+    <div style="margin:10px 0 2px;font-size:12px;color:var(--sub)">直选参考（各位置频率最高）：${[...r.straight].join(' ')} · 该直选命中概率估算 <b>${(r.straightProb*100).toFixed(2)}%</b></div>
+  </div>`;
+  html=`<div class="block" style="margin-top:0">
+    <div class="t">下期形态概率（连态修正 · 基于「${WIN_LABEL[state.win]}」${sp.N} 期）</div>
+    ${shapeHtml}
+  </div>${recHtml}`;
+  note=`<b>逻辑说明</b>：① 先按「组三/组六 最近连续期数」做<b>连态修正</b>——某形态连出越久，下一期切到另一形态的概率越高（均值回归），从而算出连态修正后的形态概率；② 在概率最高的形态下，用<b>窗口内各数字频率</b>最大化选法挑出具体号码（组六取频次 Top3 各不相同；组三取频次 Top1 重复 + Top2 不同）；③ 同时给出各位置频率最高的「直选参考」。所有概率均为<b>频率模型估算</b>，3 位直选真实命中恒为 1/1000，本方案不提高中奖概率，仅供娱乐参考。`;
+  document.getElementById('smartBox').innerHTML=html;
+  document.getElementById('smartNote').innerHTML=note;
+}
+
 /* ---------- 独飞精 · 胆码推荐（师傅格式） ---------- */
 function duFeiJing(mode){
   mode = mode || state.pick;
@@ -745,7 +873,7 @@ function buildWinSel(){
     const b=document.createElement('button');
     b.className='wbtn'+(w===state.win?' active':'');
     b.textContent=WIN_LABEL[w];
-    b.onclick=()=>{ state.win=w; buildWinSel(); renderCards(); renderPositions(); renderCombo(); renderPred(); renderFive(); renderDFJ(); };
+    b.onclick=()=>{ state.win=w; buildWinSel(); renderCards(); renderPositions(); renderCombo(); renderPred(); renderFive(); renderDFJ(); renderSmart(); };
     el.appendChild(b);
   });
 }
@@ -756,13 +884,13 @@ function buildPickSel(){
     const b=document.createElement('button');
     b.className='wbtn'+(p===state.pick?' active':'');
     b.textContent=PICK_LABEL[p];
-    b.onclick=()=>{ state.pick=p; buildPickSel(); renderFive(); renderDFJ(); };
+    b.onclick=()=>{ state.pick=p; buildPickSel(); renderFive(); renderDFJ(); renderSmart(); };
     el.appendChild(b);
   });
 }
 function renderAll(){
   buildTabs(); buildWinSel(); buildPickSel();
-  renderCards(); renderPositions(); renderCombo(); renderPred(); renderFive(); renderDFJ();
+  renderCards(); renderPositions(); renderCombo(); renderPred(); renderFive(); renderDFJ(); renderSmart();
   const a=allData();
   const extra = localCachedCount>0 ? `（含本地补充 ${localCachedCount} 条，已自动载入历史数据）` : '';
   document.getElementById('status').textContent=`已加载 ${g().name}：${a[0].code}(${a[0].day}) ~ ${a[a.length-1].code}(${a[a.length-1].day})，共 ${a.length} 期。点击右上角可刷新最新开奖。${extra}`;
@@ -818,7 +946,7 @@ document.getElementById('autoBtn').onclick=()=>setAuto(!state.auto);
 
 /* ---------- 推算下一期按钮 ---------- */
 function calcNext(){
-  renderCards(); renderPred(); renderFive(); renderDFJ();
+  renderCards(); renderPred(); renderFive(); renderDFJ(); renderSmart();
   const sec=document.getElementById('predSection');
   if(sec){
     sec.scrollIntoView({behavior:'smooth',block:'start'});
