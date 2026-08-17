@@ -605,13 +605,19 @@ function duFeiJing(){
     pair(du[0],supports[0]),
     pair(supports[0],supports[1])
   ];
-  // 精 (精选 3 位数) = 独[0] + 飞数字的两两组合，共 4 注
+  // 精 (精选)：按「组三:组六 = 3:4」的自然比例混合（组选池 90 组三 / 120 组六 ≈ 3:4）
+  // 候选池 = 独 ∪ supports ∪ 两个最冷，保证足量候选；所有精均含胆码 du[0]
+  const jingPool=[...new Set([...du, ...supports, ...cold.slice(0,2)])];
+  const jingRest=jingPool.filter(x=>x!==du[0]);
+  const sixJ=[];                                   // 组六（三不同）：du[0] + 任取两不同
+  for(let a=0;a<jingRest.length;a++)
+    for(let b=a+1;b<jingRest.length;b++)
+      sixJ.push([du[0],jingRest[a],jingRest[b]].join(''));
+  const threeJ=jingRest.map(x=>[du[0],du[0],x].join(''));   // 组三（两同）：du[0] 重复 + 一不同
   const jing=[];
-  for(let i=0;i<feiDigits.length && jing.length<4;i++){
-    for(let j=i+1;j<feiDigits.length && jing.length<4;j++){
-      jing.push([du[0],feiDigits[i],feiDigits[j]].join(''));
-    }
-  }
+  const TOTAL=7, nSix=Math.round(TOTAL*4/7), nThree=TOTAL-nSix;   // 4 组六 + 3 组三
+  for(let i=0;i<nSix && i<sixJ.length;i++) jing.push(sixJ[i]);
+  for(let i=0;i<nThree && i<threeJ.length;i++) jing.push(threeJ[i]);
   // 四/五/六：四码=独+supports，五码=四+top-2 冷，六码=五+top-3 冷（去重保唯一）
   const si=[...new Set([...du, ...supports])].slice(0,4);
   const wu=[...new Set([...si, ...cold])].slice(0,5);
@@ -699,7 +705,7 @@ function renderDFJ(){
     <div class="dfj-numrow dfj-pred">${predCombosHtml}</div>
   `;
   document.getElementById('dfjBox').innerHTML=html;
-  document.getElementById('dfjNote').innerHTML=`<b>说明</b>：「独」=胆码（窗口频次 Top2，最可能开出）；「飞」=两码组合（独∪独 / 独∪support / support∪support）；「精」=精选 3 位数（独[0]+飞数字两两配对）；「四/五/六」=号码池长度递增；「直」=组六候选（${r.zhi.length} 注，<b>三不同</b>）；「对」=组三候选（${r.dui.length} 注，<b>含对子</b>）。锚定期号《${r.anchors.join(' ')}》为最近 2 期开奖。「下一期推测」= 由 热号/冷号/邻号/均值 四类思路轮换合成 ${pr.combos.length} 注直选参考（已排除上一期本身）。仅供娱乐参考，不保证中奖。`;
+  document.getElementById('dfjNote').innerHTML=`<b>说明</b>：「独」=胆码（窗口频次 Top2，最可能开出）；「飞」=两码组合（独∪独 / 独∪support / support∪support）；「精」=精选 7 注（均含胆码 du[0]，按 组六:组三=4:3 自然比例：4 注组六 + 3 注组三）；「四/五/六」=号码池长度递增；「直」=组六候选（${r.zhi.length} 注，<b>三不同</b>）；「对」=组三候选（${r.dui.length} 注，<b>含对子</b>）。锚定期号《${r.anchors.join(' ')}》为最近 2 期开奖。「下一期推测」= 由 热号/冷号/邻号/均值 四类思路轮换合成 ${pr.combos.length} 注直选参考（已排除上一期本身）。仅供娱乐参考，不保证中奖。`;
 }
 
 /* ---------- 交互 ---------- */
