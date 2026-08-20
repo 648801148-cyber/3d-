@@ -138,7 +138,6 @@ footer{margin-top:24px;font-size:11.5px;color:var(--sub);line-height:1.7;border-
     <div class="tabs" id="tabs"></div>
     <button class="refresh" id="refreshBtn">🔄 刷新最新开奖</button>
     <button class="auto on" id="autoBtn">🔁 自动更新：开</button>
-    <button class="predict-btn" id="predictBtn">🎯 推算下一期</button>
     <div class="win-sel" id="winSel">
       <span>样本窗口</span>
     </div>
@@ -151,11 +150,6 @@ footer{margin-top:24px;font-size:11.5px;color:var(--sub);line-height:1.7;border-
   <div class="cards" id="cards"></div>
 
   <section>
-    <h2>分位分析（百位 / 十位 / 个位 …）</h2>
-    <div class="pos-grid" id="posGrid"></div>
-  </section>
-
-  <section>
     <h2>组合 / 形态分析</h2>
     <div id="comboBox"></div>
   </section>
@@ -163,16 +157,6 @@ footer{margin-top:24px;font-size:11.5px;color:var(--sub);line-height:1.7;border-
   <section>
     <h2>🔥❄️ 冷热温号规律 · 下一期数字概率 · 五组精选号</h2>
     <div id="hcwBox"></div>
-  </section>
-
-  <section id="predSection">
-    <h2>下一期参考（多种统计思路合成）</h2>
-    <div class="pred-grid" id="predBox"></div>
-    <div style="margin-top:12px">
-      <div class="t" style="font-size:13px;font-weight:600;color:var(--ink);margin-bottom:6px">📋 参考组合（每注独立等概率）</div>
-      <div class="combos" id="combos"></div>
-      <div class="note" id="predNote"></div>
-    </div>
   </section>
 
   <section>
@@ -295,7 +279,7 @@ function renderCards(){
   const html = `
     <div class="card"><div class="k">当前玩法</div><div class="v">${g().name}</div></div>
     <div class="card"><div class="k">最新一期（${rec.code}）</div><div class="v digits"><span>${rec.d.join('</span><span>')}</span></div><div class="k" style="margin-top:4px">${rec.day}</div></div>
-    <div class="card"><div class="k">推算下一期</div><div class="v">${nextStr}</div></div>
+    <div class="card"><div class="k">下一期开奖</div><div class="v">${nextStr}</div></div>
     <div class="card"><div class="k">历史总期数</div><div class="v">${allData().length.toLocaleString()}</div></div>
     <div class="card"><div class="k">数据区间</div><div class="v" style="font-size:14px">${allData()[0].code} ~ ${rec.code}</div></div>
   `;
@@ -303,75 +287,6 @@ function renderCards(){
 }
 
 /* ---------- 渲染：分位 ---------- */
-function renderPositions(){
-  const pos=g().pos, win=winData(), full=allData();
-  const exp = win.length/10;
-  let html='';
-  pos.forEach((pname,pi)=>{
-    const f=freqAt(pi,win);
-    const om=omissionAt(pi);
-    const fm=formAt(pi,win);
-    const maxF=Math.max(...f, exp);
-    // 排序找冷热
-    const order=[...Array(10).keys()].sort((a,b)=>f[b]-f[a]);
-    const hotSet=new Set(order.slice(0,3)), coldSet=new Set(order.slice(-3));
-    // 频率柱
-    let bars='';
-    for(let v=0;v<10;v++){
-      const h=Math.max(2, f[v]/maxF*90);
-      const col = hotSet.has(v)?'var(--hot)':(coldSet.has(v)?'var(--cold)':'#9aa6b8');
-      bars+=`<div class="bar"><div class="cnt">${f[v]}</div><div class="col" style="height:${h}px;background:${col}"></div><div class="lab">${v}</div></div>`;
-    }
-    const expY = (1 - exp/maxF)*90; // 期望线位置(近似)
-    // 形态
-    const forms=`<div class="forms">
-      <div class="form">奇 ${Math.round(fm.odd*100)}%</div>
-      <div class="form">大 ${Math.round(fm.big*100)}%</div>
-      <div class="form">质 ${Math.round(fm.prime*100)}%</div>
-    </div>`;
-    // 遗漏网格
-    let omHtml='<div class="omission">';
-    const maxCur=Math.max(...Object.values(om.cur),1);
-    for(let v=0;v<10;v++){
-      const ratio=om.cur[v]/maxCur;
-      const bg=`rgba(${Math.round(226+ (250-226)*0)},${Math.round(59 - 30*ratio)},${Math.round(59 - 30*ratio)},${0.35+0.6*ratio})`;
-      // 红=遗漏大(偏热回补)，蓝=遗漏小
-      const r=Math.round(47+ (226-47)*ratio), b=Math.round(237 - (237-59)*ratio), gg=Math.round(110 - (110-59)*ratio);
-      omHtml+=`<div class="om" style="background:rgb(${r},${gg},${b})" title="数字${v}：当前遗漏${om.cur[v]}期，历史最大遗漏${om.max[v]}期"><b>${v}</b><small>遗${om.cur[v]}</small></div>`;
-    }
-    omHtml+='</div>';
-    // 走势(最近30期)
-    const k=Math.min(30, full.length);
-    const seq=full.slice(-k).map(r=>r.d[pi]);
-    const W=300,H=74,pad=6;
-    const pts=seq.map((v,i)=>{
-      const x=pad+i*(W-2*pad)/(k-1);
-      const y=pad+(1-v/9)*(H-2*pad);
-      return x.toFixed(1)+','+y.toFixed(1);
-    }).join(' ');
-    const trend=`<svg class="trend" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
-      <line x1="${pad}" y1="${pad}" x2="${W-pad}" y2="${pad}" stroke="#eef0f4"/>
-      <line x1="${pad}" y1="${H-pad}" x2="${W-pad}" y2="${H-pad}" stroke="#eef0f4"/>
-      <polyline points="${pts}" fill="none" stroke="var(--blue)" stroke-width="1.6"/>
-      ${seq.map((v,i)=>{const x=pad+i*(W-2*pad)/(k-1);const y=pad+(1-v/9)*(H-2*pad);return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="1.8" fill="var(--blue)"/>`}).join('')}
-    </svg><div class="note">最近 ${k} 期走势（纵轴 0–9）</div>`;
-
-    html+=`<div class="pos">
-      <h3>${pname}位 <span class="tag">样本 ${WIN_LABEL[state.win]} · ${win.length} 期</span></h3>
-      <div class="block"><div class="t">出现频率（红=热号 / 蓝=冷号，虚线=全量期望 ${exp.toFixed(1)}）</div>
-        <div class="bars">${bars}</div>
-        <div class="exp-line"><span>期望</span></div>
-      </div>
-      <div class="block"><div class="t">形态占比（奇/大/质）</div>${forms}</div>
-      <div class="block"><div class="t">遗漏（数字格颜色越红=当前遗漏越大，越可能回补）</div>${omHtml}
-        <div class="note">历史最大遗漏： ${[...Array(10).keys()].map(v=>v+':'+om.max[v]).join('  ')}</div>
-      </div>
-      <div class="block">${trend}</div>
-    </div>`;
-  });
-  document.getElementById('posGrid').innerHTML=html;
-}
-
 /* ---------- 渲染：组合/形态 ---------- */
 function histChart(vals, lo, hi){
   const cnt=new Array(hi-lo+1).fill(0);
@@ -568,57 +483,6 @@ function renderHCW(){
 }
 
 /* ---------- 预测 ---------- */
-function predict(){
-  const pos=g().pos, npos=pos.length, win=winData();
-  const rank=(arr)=>[...Array(10).keys()].sort((a,b)=>arr[b]-arr[a]);
-  const hot=pos.map((_,pi)=>rank(freqAt(pi,win)).slice(0,3));
-  const cold=pos.map((_,pi)=>rank(freqAt(pi,win)).reverse().slice(0,3));
-  const latest=win[win.length-1].d;
-  const neighbor=pos.map((_,pi)=>{
-    const v=latest[pi], set=[];
-    for(const off of [-1,1,-2,2]){const x=((v+off)%10+10)%10; if(!set.includes(x))set.push(x);}
-    return set.slice(0,3);
-  });
-  const mean=pos.map((_,pi)=>{
-    const avg=win.reduce((s,r)=>s+r.d[pi],0)/win.length;
-    return [...Array(10).keys()].sort((a,b)=>Math.abs(a-avg)-Math.abs(b-avg)).slice(0,3);
-  });
-  const methods=[hot,cold,neighbor,mean];
-  const combos=[], seen=new Set();
-  const latestKey=latest.join('');
-  let att=0;
-  while(combos.length<10 && att<300){
-    const combo=[];
-    for(let pi=0;pi<npos;pi++){
-      const m=methods[att%4][pi];
-      combo.push(m[att%m.length]);
-    }
-    att++;
-    const key=combo.join('');
-    if(key===latestKey) continue;          // 不选上一期本身
-    if(seen.has(key)) continue;
-    seen.add(key); combos.push(combo);
-  }
-  return {hot,cold,neighbor,mean,combos,latest,latestCode:win[win.length-1].code};
-}
-function renderPred(){
-  const pr=predict();
-  const pos=g().pos;
-  const names=['热号追踪','冷号回补','邻号延伸','均值中心'];
-  const sets=[pr.hot,pr.cold,pr.neighbor,pr.mean];
-  let html='';
-  pos.forEach((pname,pi)=>{
-    let inner='';
-    sets.forEach((s,si)=>{
-      inner+=`<div class="m">${names[si]}</div><div class="chip-row">${s[pi].map((v,i)=>`<span class="chip ${si===0?'hot':(si===1?'cold':'')}">${v}</span>`).join('')}</div>`;
-    });
-    html+=`<div class="pred"><h3 style="margin:0 0 4px;font-size:15px">${pname}位候选</h3>${inner}</div>`;
-  });
-  document.getElementById('predBox').innerHTML=html;
-  document.getElementById('combos').innerHTML=pr.combos.map(c=>`<div class="combo">${c.join('')}<small>直选参考</small></div>`).join('');
-  document.getElementById('predNote').innerHTML=`基于「${WIN_LABEL[state.win]}」样本，由 热号/冷号/邻号/均值 四类思路轮换合成 ${pr.combos.length} 注参考组合。推算基准（最新一期）<b>${pr.latestCode}</b>：${pr.latest.join(' ')}（刷新追加的最新开奖已纳入历史并参与统计）。再次强调：仅供娱乐参考，不保证中奖。`;
-}
-
 /* ---------- 五码预测：全热 + 冷热搭配（两组号码） ---------- */
 function fiveSets(){
   const win=winData(), full=allData();
@@ -1069,10 +933,6 @@ function renderDFJ(){
   const anchorStr=r.anchors.length? `<span class="anchor">《<b>${r.anchors.join(' ')}</b>》</span>`:'';
   const zhiHtml=r.zhi.map(n=>`<span class="n">${n}</span>`).join('');
   const duiHtml=r.dui.map(n=>`<span class="n">${n}</span>`).join('');
-  // 下一期推测：复用数据合成预测（热/冷/邻/均 四类思路），折叠进本卡
-  const pr=predict();
-  const posHtml=pr.hot.map((h,pi)=>`<span class="pos"><b>${g().pos[pi]}</b>${h.map(v=>`<span class="n hot">${v}</span>`).join('')}</span>`).join('');
-  const predCombosHtml=pr.combos.map(c=>`<span class="n">${c.join('')}</span>`).join('');
   const html=`
     <div class="dfj-head">
       <span class="ttl">${g().name}</span>
@@ -1089,13 +949,9 @@ function renderDFJ(){
     <div class="dfj-numrow">${zhiHtml}</div>
     <div class="dfj-sub"><span class="lbl2">对</span>${anchorStr}<span class="dfj-tag">组三（含对子）· 共 ${r.dui.length} 注</span></div>
     <div class="dfj-numrow">${duiHtml}</div>
-    <div class="dfj-divider"></div>
-    <div class="dfj-sub"><span class="lbl2">下一期推测</span><span class="dfj-tag">数据合成 · 直选参考（热/冷/邻/均 四类思路轮换）</span></div>
-    <div class="dfj-pos">${posHtml}</div>
-    <div class="dfj-numrow dfj-pred">${predCombosHtml}</div>
   `;
   document.getElementById('dfjBox').innerHTML=html;
-  document.getElementById('dfjNote').innerHTML=`<b>说明</b>：当前策略 <b>${r.pickLabel}</b>。「独」=胆码（按策略取 Top2：${r.du.join('、')}）；「飞」=两码组合；「精」=精选 7 注（均含胆码 du[0]，按 组六:组三=4:3 自然比例：4 注组六 + 3 注组三）；「四/五/六」=号码池长度递增；「直」=组六候选（${r.zhi.length} 注，<b>三不同</b>）；「对」=组三候选（${r.dui.length} 注，<b>含对子</b>）。<b style="color:var(--hot)">红=热号</b>，<b style="color:var(--cold)">蓝=冷号</b>。锚定期号《${r.anchors.join(' ')}》为最近 2 期开奖。<b style="color:var(--red)">「精 / 直 / 对」均已自动剔除上一期开奖号码（回声排除），避免出现刚开出的组合。</b>「下一期推测」= 由 热号/冷号/邻号/均值 四类思路轮换合成 ${pr.combos.length} 注直选参考（已排除上一期本身）。仅供娱乐参考，不保证中奖。`;
+  document.getElementById('dfjNote').innerHTML=`<b>说明</b>：当前策略 <b>${r.pickLabel}</b>。「独」=胆码（按策略取 Top2：${r.du.join('、')}）；「飞」=两码组合；「精」=精选 7 注（均含胆码 du[0]，按 组六:组三=4:3 自然比例：4 注组六 + 3 注组三）；「四/五/六」=号码池长度递增；「直」=组六候选（${r.zhi.length} 注，<b>三不同</b>）；「对」=组三候选（${r.dui.length} 注，<b>含对子</b>）。<b style="color:var(--hot)">红=热号</b>，<b style="color:var(--cold)">蓝=冷号</b>。锚定期号《${r.anchors.join(' ')}》为最近 2 期开奖。<b style="color:var(--red)">「精 / 直 / 对」均已自动剔除上一期开奖号码（回声排除），避免出现刚开出的组合。</b>仅供娱乐参考，不保证中奖。`;
 }
 
 /* ---------- 交互 ---------- */
@@ -1111,7 +967,7 @@ function buildWinSel(){
     const b=document.createElement('button');
     b.className='wbtn'+(w===state.win?' active':'');
     b.textContent=WIN_LABEL[w];
-    b.onclick=()=>{ state.win=w; buildWinSel(); renderCards(); renderPositions(); renderCombo(); renderHCW(); renderPred(); renderFive(); renderDFJ(); renderSmart(); };
+    b.onclick=()=>{ state.win=w; buildWinSel(); renderCards(); renderCombo(); renderHCW(); renderFive(); renderDFJ(); renderSmart(); };
     el.appendChild(b);
   });
 }
@@ -1128,7 +984,7 @@ function buildPickSel(){
 }
 function renderAll(){
   buildTabs(); buildWinSel(); buildPickSel();
-  renderCards(); renderPositions(); renderCombo(); renderHCW(); renderPred(); renderFive(); renderDFJ(); renderSmart();
+  renderCards(); renderCombo(); renderHCW(); renderFive(); renderDFJ(); renderSmart();
   const a=allData();
   const extra = localCachedCount>0 ? `（含本地补充 ${localCachedCount} 条，已自动载入历史数据）` : '';
   document.getElementById('status').textContent=`已加载 ${g().name}：${a[0].code}(${a[0].day}) ~ ${a[a.length-1].code}(${a[a.length-1].day})，共 ${a.length} 期。点击右上角可刷新最新开奖。${extra}`;
@@ -1181,20 +1037,6 @@ function setAuto(on){
   if(on){ autoTimer=setInterval(()=>{ refresh(true); }, 30*60*1000); } // 每 30 分钟后台刷新
 }
 document.getElementById('autoBtn').onclick=()=>setAuto(!state.auto);
-
-/* ---------- 推算下一期按钮 ---------- */
-function calcNext(){
-  renderCards(); renderHCW(); renderPred(); renderFive(); renderDFJ(); renderSmart();
-  const sec=document.getElementById('predSection');
-  if(sec){
-    sec.scrollIntoView({behavior:'smooth',block:'start'});
-    sec.style.transition='box-shadow .3s'; sec.style.boxShadow='0 0 0 3px rgba(232,89,12,.55)';
-    setTimeout(()=>{ sec.style.boxShadow=''; }, 1300);
-  }
-  const st=document.getElementById('status');
-  if(st) st.textContent=`🎯 已按「${WIN_LABEL[state.win]}」样本重新推算下一期参考（仅供娱乐参考，不保证中奖）。`;
-}
-document.getElementById('predictBtn').onclick=calcNext;
 
 /* ---------- 初始化 ---------- */
 loadStored();
