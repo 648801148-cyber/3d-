@@ -137,6 +137,7 @@ footer{margin-top:24px;font-size:11.5px;color:var(--sub);line-height:1.7;border-
 .bt-row{font-size:12px;padding:3px 6px;border:1px solid #e3e8ef;border-radius:6px;background:#fff;font-variant-numeric:tabular-nums}
 .bt-row.hit{border-color:var(--hot);color:var(--hot);font-weight:700}
 .bt-sum{margin-top:8px;font-size:13px;color:#556;line-height:1.6}
+.chip.jmp{background:linear-gradient(180deg,#eaf3ff,#d4e6ff);border-color:#9cc2f0;color:#1b5fbf}
 </style>
 </head>
 <body>
@@ -572,6 +573,7 @@ function refCombos(){
 }
 function renderFive(){
   const s=fiveSets();
+  const jf=jumpFive();                                   // 最新规律（跳跃+差距修正）五码
   const npos=g().pos.length, is3=npos===3;
   const chip=(v,kind)=>`<span class="chip ${kind}" style="font-size:17px;font-weight:700;min-width:30px;text-align:center">${v}</span>`;
   const chipsA=s.groupA.map(v=>chip(v,'hot')).join('');
@@ -633,12 +635,13 @@ function renderFive(){
     <div style="margin-bottom:10px"><div class="note" style="margin-bottom:6px">① 全热五码（近期最热 5 个）</div><div class="chip-row" style="gap:6px">${chipsA}</div></div>
     <div style="margin-bottom:10px"><div class="note" style="margin-bottom:6px">② 冷热搭配五码（3 热 + 2 冷，冷号取当前遗漏最大）</div><div class="chip-row" style="gap:6px">${chipsB}</div></div>
     <div><div class="note" style="margin-bottom:6px">③ 全冷五码（当前遗漏最大 5 个，纯冷号）</div><div class="chip-row" style="gap:6px">${chipsC}</div></div>
+    <div style="margin-top:10px"><div class="note" style="margin-bottom:6px">④ <b style="color:#1b5fbf">最新规律五码</b>（位数跳跃 + 近 ${BACKTEST_N} 期差距修正 · 每日主推来源）· 主推 <b style="color:#1b5fbf">${is3?jf.main.join(''):jf.main.join(' ')}</b></div><div class="chip-row" style="gap:6px">${jf.five.map(v=>chip(v,'jmp')).join('')}</div></div>
     ${probHtml}${refHtml}${shapeHtml}</div>`;
   let note;
   if(is3){
-    note=`给出 <b>两组各 5 个号码</b>：① 全热 ${s.groupA.join('、')}；② 冷热搭配 ${s.groupB.join('、')}（3 热 + 2 冷）。按「五选三 · 组选复试」每组从 5 个号任取 3 个，各 <b>C(5,3)=10</b> 注，两组覆盖两种思路。只要当期开奖 3 个号<b>全部落在某一组 5 码内</b>即中组选。当前窗口「全热」概率 <b>${pct(pr.allHot)}</b>、「冷热搭配」概率 <b>${pct(pr.mix)}</b>，可据此侧重。仅供娱乐参考，不保证中奖。`;
+    note=`给出 <b>四组各 5 个号码</b>：① 全热 ${s.groupA.join('、')}；② 冷热搭配 ${s.groupB.join('、')}（3 热 + 2 冷）；③ 全冷 ${s.groupC.join('、')}；④ <b style="color:#1b5fbf">最新规律五码 ${jf.five.join('、')}</b>（位数跳跃 + 近 ${BACKTEST_N} 期差距修正，每日主推来源，主推 ${jf.main.join('')}）。前 3 组按「五选三 · 组选复试」每组从 5 个号任取 3 个，各 <b>C(5,3)=10</b> 注；④ 跟随每日主推规律。只要当期开奖 3 个号<b>全部落在某一组 5 码内</b>即中组选。当前窗口「全热」概率 <b>${pct(pr.allHot)}</b>、「冷热搭配」概率 <b>${pct(pr.mix)}</b>。仅供娱乐参考，不保证中奖。`;
   } else {
-    note=`排列五为 5 位玩法，「五选三」组选概念适用于 3 位玩法（福彩3D / 排列三）。这里给出两组参考号码：① 全热 ${s.groupA.join('、')}；② 冷热搭配 ${s.groupB.join('、')}（3 热 + 2 冷），可作选号参考。请理性购彩。`;
+    note=`排列五为 5 位玩法，「五选三」组选概念适用于 3 位玩法（福彩3D / 排列三）。这里给出参考号码：① 全热 ${s.groupA.join('、')}；② 冷热搭配 ${s.groupB.join('、')}（3 热 + 2 冷）；③ 全冷 ${s.groupC.join('、')}；④ <b style="color:#1b5fbf">最新规律五码 ${jf.five.join('、')}</b>（主推 ${jf.main.join(' ')}），可作选号参考。请理性购彩。`;
   }
   document.getElementById('fiveNote').innerHTML=note;
 }
@@ -862,6 +865,15 @@ function duFeiJing(mode){
     pool=[...hot].slice(0,6);                             // 6 个最热号
     pickLabel='🔥全热';
   }
+  // 结合最新规律（跳跃 + 差距修正）：独码 = 最新规律中"最确定"的 2 个位的主推数字；支撑/池保留策略风味
+  const jm=jumpRule();
+  const order=[...Array(jm.npos).keys()].sort((a,b)=>jm.conf[b]-jm.conf[a]);
+  const jmDu=[ jm.main[order[0]], jm.main[order[1]!==undefined?order[1]:order[0]] ];
+  const supFromPool=pool.filter(x=>!jmDu.includes(x)).slice(0,2);
+  du=jmDu.slice();
+  supports=(supFromPool.length>=2? supFromPool : [...supFromPool, ...pool.filter(x=>!jmDu.includes(x)&&!supFromPool.includes(x))]).slice(0,2);
+  pool=[...new Set([...du, ...supports, ...pool])].slice(0,6);
+  const jmMainStr=jm.main.join('');
   const feiDigits=[...new Set([...du, ...supports])];     // 飞涉及的数字 = 独 ∪ supports
   // 上一期开奖（用于排除直/对回声）
   const last=win[win.length-1].d;
@@ -931,7 +943,8 @@ function duFeiJing(mode){
   const last2 = win.slice(-2);
   const anchors = [last2[last2.length-2]?.code, last2[last2.length-1]?.code].filter(Boolean);
   const hotSet=new Set(hot), coldSet=new Set(cold);
-  return {du, fei, jing, si, wu, liu, zhi, dui, anchors, hotSet, coldSet, pickLabel, mode};
+  return {du, fei, jing, si, wu, liu, zhi, dui, anchors, hotSet, coldSet, pickLabel, mode,
+          jmMain:jmMainStr, jmCorr:jm.corr, jmRaw:jm.raw.join('')};
 }
 function renderDFJ(){
   const r=duFeiJing();
@@ -958,7 +971,8 @@ function renderDFJ(){
       <span class="date">${dateStr}</span>
       <span class="legend">策略：${r.pickLabel} · 窗口：${WIN_LABEL[state.win]} · 独=胆码 · 飞=两码 · 精=精选 · 直=组六 · 对=对子</span>
     </div>
-    <div class="dfj-row"><span class="lbl">独</span><span class="v">${duPair(r.du[0])}${duPair(r.du[1])}</span></div>
+    <div class="dfj-row"><span class="lbl">跳</span><span class="v"><b style="color:var(--blue)">${r.jmMain}</b> <small style="color:var(--sub)">最新规律主推（跳跃+差距修正）· 已融入下方独码</small></span></div>
+    <div class="dfj-row"><span class="lbl">独</span><span class="v">${duPair(r.du[0])}${duPair(r.du[1])} <small style="color:var(--blue)">← 取最新规律最确定两位</small></span></div>
     <div class="dfj-row"><span class="lbl">飞</span><span class="v">${r.fei.map(p=>`<span class="pair ${p.split('').map(numCls).filter(Boolean).join(' ')}">${p}</span>`).join('')}</span></div>
     <div class="dfj-row"><span class="lbl">精</span><span class="v">${r.jing.map(n=>`<span class="num">${n}</span>`).join('')}</span></div>
     <div class="dfj-row"><span class="lbl">四</span><span class="v"><span class="set">${siDigits.replace(/ /g,' ')}</span></span></div>
@@ -970,7 +984,7 @@ function renderDFJ(){
     <div class="dfj-numrow">${duiHtml}</div>
   `;
   document.getElementById('dfjBox').innerHTML=html;
-  document.getElementById('dfjNote').innerHTML=`<b>说明</b>：当前策略 <b>${r.pickLabel}</b>。「独」=胆码（按策略取 Top2：${r.du.join('、')}）；「飞」=两码组合；「精」=精选 7 注（均含胆码 du[0]，按 组六:组三=4:3 自然比例：4 注组六 + 3 注组三）；「四/五/六」=号码池长度递增；「直」=组六候选（${r.zhi.length} 注，<b>三不同</b>）；「对」=组三候选（${r.dui.length} 注，<b>含对子</b>）。<b style="color:var(--hot)">红=热号</b>，<b style="color:var(--cold)">蓝=冷号</b>。锚定期号《${r.anchors.join(' ')}》为最近 2 期开奖。<b style="color:var(--red)">「精 / 直 / 对」均已自动剔除上一期开奖号码（回声排除），避免出现刚开出的组合。</b>仅供娱乐参考，不保证中奖。`;
+  document.getElementById('dfjNote').innerHTML=`<b>说明</b>：当前策略 <b>${r.pickLabel}</b>。<b style="color:var(--blue)">「跳」行 = 最新规律（位数跳跃 + 近 ${BACKTEST_N} 期差距修正）主推 ${r.jmMain}</b>，<b>「独」=胆码已结合最新规律</b>——取最新规律中最确定的 2 个位的主推数字（${r.du.join('、')}），使独飞精跟随每日主推；支撑码与号码池仍保留当前策略（${r.pickLabel}）的热/冷风味。「飞」=两码组合；「精」=精选 7 注（均含胆码 du[0]，按 组六:组三=4:3 自然比例：4 注组六 + 3 注组三）；「四/五/六」=号码池长度递增；「直」=组六候选（${r.zhi.length} 注，<b>三不同</b>）；「对」=组三候选（${r.dui.length} 注，<b>含对子</b>）。<b style="color:var(--hot)">红=热号</b>，<b style="color:var(--cold)">蓝=冷号</b>。锚定期号《${r.anchors.join(' ')}》为最近 2 期开奖。<b style="color:var(--red)">「精 / 直 / 对」均已自动剔除上一期开奖号码（回声排除）。</b>仅供娱乐参考，不保证中奖。`;
 }
 
 /* ---------- 位数跳跃规律 + 官方3D图综合分析（每日主推） ---------- */
@@ -1024,6 +1038,27 @@ function gapCorrection(){
   }
   const corr=corrW.map(s=>(((Math.round(s/sumW))%10)+10)%10);  // 逐位平均偏移（修正量）
   return {corr, bt:BT, rows, hit, hitRate:hit/BT};
+}
+
+// 最新规律（跳跃 + 差距修正）统一对外接口：供 独飞精 / 五码预测 复用，避免重复计算
+function jumpRule(){
+  const pos=g().pos, npos=pos.length;
+  const gc=gapCorrection();
+  const info=pos.map((_,pi)=>predictPosJump(pi));
+  const raw=info.map(x=>x.top[0].nd);
+  const main=raw.map((v,pi)=>(v+gc.corr[pi])%10);            // 经差距修正后的最终主推
+  const topSets=info.map(x=>x.top.map(c=>c.nd));             // 每位 top4 候选数字
+  const conf=info.map(x=>x.top[0].score-x.top[1].score);     // 每位"确定性"（top1-top2 分差，越大越可信）
+  return {pos,npos,raw,corr:gc.corr,main,topSets,conf,bt:gc.bt,hit:gc.hit,hitRate:gc.hitRate};
+}
+// 由最新规律得出"五码"号码池：跨位汇总各位 top 候选，按被推荐强度排序取前 5
+function jumpFive(){
+  const jm=jumpRule();
+  const score=new Array(10).fill(0);
+  jm.topSets.forEach(set=>{ set.forEach((d,rank)=>{ score[d]+=(set.length-rank); }); });
+  jm.main.forEach(d=>{ score[d]+=5; });                      // 修正后主推位加权
+  const five=[...Array(10).keys()].sort((a,b)=> score[b]-score[a] || a-b).slice(0,5);
+  return {five, main:jm.main, raw:jm.raw, corr:jm.corr, bt:jm.bt};
 }
 function renderJump(){
   const pos=g().pos, npos=pos.length, is3=npos===3;
