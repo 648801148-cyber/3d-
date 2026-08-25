@@ -124,6 +124,19 @@ footer{margin-top:24px;font-size:11.5px;color:var(--sub);line-height:1.7;border-
 .dfj-pos .pos .n{font-size:13px;padding:1px 6px}
 .dfj-pred{margin-left:38px}
 .dfj-pred .n{background:linear-gradient(180deg,#fff,#fff6ec);border-color:#f0d9bf;color:var(--red)}
+/* 位数跳跃规律 */
+.jbars{display:flex;align-items:flex-end;gap:3px;height:60px}
+.jbar{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end}
+.jbar .jcol{width:100%;border-radius:3px 3px 0 0;min-height:2px;background:#9aa6b8}
+.jbar .jlab{font-size:10px;color:var(--sub);margin-top:3px}
+.dims{display:flex;flex-wrap:wrap;gap:8px}
+.dims span{background:var(--chip);border-radius:8px;padding:5px 10px;font-size:12.5px}
+.dims b{color:var(--ink);font-variant-numeric:tabular-nums}
+.note-inline{background:#fff8ef;border:1px solid #f0d9bf;color:#7a5a2a;font-size:12px;border-radius:8px;padding:6px 9px;margin-top:8px}
+.bt{display:flex;flex-wrap:wrap;gap:6px}
+.bt-row{font-size:12px;padding:3px 6px;border:1px solid #e3e8ef;border-radius:6px;background:#fff;font-variant-numeric:tabular-nums}
+.bt-row.hit{border-color:var(--hot);color:var(--hot);font-weight:700}
+.bt-sum{margin-top:8px;font-size:13px;color:#556;line-height:1.6}
 </style>
 </head>
 <body>
@@ -175,6 +188,12 @@ footer{margin-top:24px;font-size:11.5px;color:var(--sub);line-height:1.7;border-
     <h2>🎯 智能最高概率推荐（全热 / 全冷 / 冷热搭配 · 概率最高者）</h2>
     <div class="pred" id="smartBox"></div>
     <div class="note" id="smartNote" style="margin-top:8px"></div>
+  </section>
+
+  <section>
+    <h2>📐 位数跳跃规律 · 官方3D图综合分析（每日主推）</h2>
+    <div class="pred" id="jumpBox"></div>
+    <div class="note" id="jumpNote" style="margin-top:8px"></div>
   </section>
 
   <footer>
@@ -954,6 +973,114 @@ function renderDFJ(){
   document.getElementById('dfjNote').innerHTML=`<b>说明</b>：当前策略 <b>${r.pickLabel}</b>。「独」=胆码（按策略取 Top2：${r.du.join('、')}）；「飞」=两码组合；「精」=精选 7 注（均含胆码 du[0]，按 组六:组三=4:3 自然比例：4 注组六 + 3 注组三）；「四/五/六」=号码池长度递增；「直」=组六候选（${r.zhi.length} 注，<b>三不同</b>）；「对」=组三候选（${r.dui.length} 注，<b>含对子</b>）。<b style="color:var(--hot)">红=热号</b>，<b style="color:var(--cold)">蓝=冷号</b>。锚定期号《${r.anchors.join(' ')}》为最近 2 期开奖。<b style="color:var(--red)">「精 / 直 / 对」均已自动剔除上一期开奖号码（回声排除），避免出现刚开出的组合。</b>仅供娱乐参考，不保证中奖。`;
 }
 
+/* ---------- 位数跳跃规律 + 官方3D图综合分析（每日主推） ---------- */
+// 每位数字：上期 -> 下期的"跳跃"偏移 j=(next-prev+10)%10
+function posSeq(pi, data){ data=data||winData(); return data.map(r=>r.d[pi]); }
+function jumpFreq(pi, data){
+  const s=posSeq(pi,data), W=s.length, f=new Array(10).fill(0);
+  for(let i=0;i<W-1;i++){ const j=((s[i+1]-s[i])%10+10)%10; f[j]+=(i+1); }   // 近期加权
+  return f;
+}
+function luTrans(data){                                  // 0/1/2 路转移 P[cur][next]，跨位汇总、近期加权
+  const W=data||winData(), P=[[0,0,0],[0,0,0],[0,0,0]];
+  for(let i=0;i<W.length-1;i++) for(let pi=0;pi<W[i].d.length;pi++){
+    const c=W[i].d[pi]%3, n=W[i+1].d[pi]%3; P[c][n]+=(i+1);
+  }
+  for(let c=0;c<3;c++){ const s=P[c].reduce((a,b)=>a+b,0)||1; for(let k=0;k<3;k++) P[c][k]/=s; }
+  return P;
+}
+function chartDims(v){ return {lu:v%3, odd:v%2===1, big:v>=5, prime:[1,2,3,5,7].includes(v)}; }
+function predictPosJump(pi, data){
+  const s=posSeq(pi,data), last=s[s.length-1];
+  const jf=jumpFreq(pi,data), P=luTrans(data), cur012=last%3, tot=jf.reduce((a,b)=>a+b,0)||1;
+  const cand=[];
+  for(let j=0;j<10;j++){
+    const nd=(last+j)%10;
+    cand.push({j, nd, jScore:jf[j]/tot, tScore:P[cur012][nd%3], score:(jf[j]/tot)+P[cur012][nd%3]});
+  }
+  cand.sort((a,b)=>b.score-a.score);
+  return {pi, last, top:cand.slice(0,4), freq:jf};
+}
+
+// 差距修正：用最近若干期"跳跃规律推测 vs 实际开奖"的偏差，回测出逐位平均偏移，反哺下一期推测
+const BACKTEST_N=30;
+function gapCorrection(){
+  const all=allData(), W=state.win, N=all.length, npos=g().pos.length;
+  const BT=Math.min(N-1, BACKTEST_N);
+  if(BT<3) return {corr:new Array(npos).fill(0), bt:0, rows:[], hit:0, hitRate:0};
+  const start=N-BT, corrW=new Array(npos).fill(0); let sumW=0; const rows=[]; let hit=0;
+  for(let i=start;i<N;i++){
+    const data=all.slice(Math.max(0,i-W), i);                 // 只用本期之前的数据推测本期
+    const actual=all[i].d;
+    const pred=g().pos.map((_,pi)=>predictPosJump(pi,data).top[0].nd);
+    const w=(i-start+1);                                       // 越近权重越大
+    sumW+=w;
+    for(let pi=0;pi<npos;pi++){
+      const e=((actual[pi]-pred[pi])%10+10)%10;                // 实际相对推测的偏移（mod10，代数上 +e 即修正到实际）
+      corrW[pi]+= e*w;
+    }
+    if(actual.every((v,pi)=>v===pred[pi])) hit++;
+    rows.push({code:all[i].code, actual:actual.join(''), pred:pred.join(''), matched:actual.every((v,pi)=>v===pred[pi])});
+  }
+  const corr=corrW.map(s=>(((Math.round(s/sumW))%10)+10)%10);  // 逐位平均偏移（修正量）
+  return {corr, bt:BT, rows, hit, hitRate:hit/BT};
+}
+function renderJump(){
+  const pos=g().pos, npos=pos.length, is3=npos===3;
+  const info=pos.map((_,pi)=>predictPosJump(pi));
+  const gap=gapCorrection();                                  // 近 BT 期"跳跃推测 vs 实际"的逐位平均偏移
+  const main=info.map(x=>x.top[0].nd);                         // 跳跃规律原始主推
+  const mainCorr=main.map((v,pi)=>(v+gap.corr[pi])%10);        // 经差距修正后的最终主推
+  let rows='';
+  info.forEach((x,pi)=>{
+    const mx=Math.max(...x.freq,1);
+    const bars=x.freq.map((f,j)=>{
+      const h=Math.max(2, f/mx*46);
+      const hot=x.top[0].j===j;
+      return `<div class="jbar"><div class="jcol" style="height:${h}px;background:${hot?'var(--hot)':'#9aa6b8'}"></div><div class="jlab">+${j}</div></div>`;
+    }).join('');
+    const cands=x.top.map(c=>`<span class="chip ${c.j===x.top[0].j?'hot':''}">${c.nd}<small>跳+${c.j}</small></span>`).join('');
+    const off=gap.corr[pi], corrNd=(x.top[0].nd+off)%10;
+    const tag = off ? `上期 ${x.last} → 主推 <b>${corrNd}</b>（跳+${x.top[0].j}，差距修正+${off}）`
+                    : `上期 ${x.last} → 主推 <b>${x.top[0].nd}</b>（跳+${x.top[0].j}）`;
+    rows+=`<div class="pos"><h3>${pos[pi]}位 <span class="tag">${tag}</span></h3>
+      <div class="block"><div class="t">跳跃偏移频率（上期→下期 +0~+9，近期加权）</div><div class="jbars">${bars}</div></div>
+      <div class="block"><div class="t">候选（跳跃分 + 0/1/2路转移分）</div><div class="chip-row">${cands}</div></div>
+      ${off?`<div class="block note-inline">近 ${gap.bt} 期差距修正：跳跃规律在该位平均偏 <b>+${off}</b>（实际相对推测的偏移），已对主推 ${x.top[0].nd} +${off} → <b>${corrNd}</b>。</div>`:''}</div>`;
+  });
+  // 官方3D图维度（针对差距修正后的主推号码）
+  const ds=mainCorr.map(chartDims);
+  const luStr=mainCorr.map(v=>v%3).join('');
+  const odd=ds.filter(d=>d.odd).length, even=npos-odd;
+  const big=ds.filter(d=>d.big).length, small=npos-big;
+  const prime=ds.filter(d=>d.prime).length, comp=npos-prime;
+  const span=Math.max(...mainCorr)-Math.min(...mainCorr), sum=mainCorr.reduce((a,b)=>a+b,0);
+  // 替补：展开"最不确定"的位（top1 与 top2 分数差最小），并同步应用差距修正
+  let weakest=0, weakGap=1e9;
+  info.forEach((x,i)=>{ const g2=x.top[0].score-x.top[1].score; if(g2<weakGap){weakGap=g2;weakest=i;} });
+  const alt=[];
+  for(let k=1;k<info[weakest].top.length;k++){ const m=mainCorr.slice(); m[weakest]=(info[weakest].top[k].nd+gap.corr[weakest])%10; alt.push(m.join('')); }
+  const dimHtml=`<div class="block" style="margin-top:10px"><div class="t">每日主推（含差距修正）的官方3D图维度</div>
+    <div class="dims">
+      <span>号码 <b>${is3?mainCorr.join(''):mainCorr.join(' ')}</b></span>
+      <span>0/1/2路 <b>${luStr}</b></span>
+      <span>奇偶 <b>${odd}奇${even}偶</b></span>
+      <span>大小 <b>${big}大${small}小</b></span>
+      <span>质合 <b>${prime}质${comp}合</b></span>
+      <span>跨度 <b>${span}</b></span>
+      <span>和值 <b>${sum}</b></span>
+    </div></div>`;
+  const altHtml=alt.length?`<div class="block" style="margin-top:10px"><div class="t">替补（最不确定位展开 · 含差距修正）</div><div class="combos">${alt.map(c=>`<div class="combo">${c}<small>替补</small></div>`).join('')}</div></div>`:'';
+  // 近 BT 期回测：用"本期之前"的数据推测本期，对比实际，验证差距修正来源
+  const btRows=gap.rows.slice(-14).reverse().map(r=>`<span class="bt-row ${r.matched?'hit':''}">${r.code.slice(-3)} 实${r.actual} 推${r.pred}${r.matched?'✓':''}</span>`).join('');
+  const corrStr=gap.corr.map((c,pi)=>`${pos[pi]}位+${c}`).join('，');
+  const btHtml=`<div class="block" style="margin-top:10px"><div class="t">近 ${gap.bt} 期回测（跳跃规律·用"本期之前"数据推测 → 对比实际 · 差距修正来源）</div>
+    <div class="bt">${btRows}</div>
+    <div class="bt-sum">原跳跃规律近 ${gap.bt} 期 全中 <b>${gap.hit}</b> 期（命中率 ${(gap.hitRate*100).toFixed(0)}%）；逐位差距修正偏移：${corrStr}。修正后主推 = 跳跃主推 + 该位偏移（mod10）。</div></div>`;
+  document.getElementById('jumpBox').innerHTML=`<div class="pred-grid">${rows}</div>${dimHtml}${altHtml}${btHtml}`;
+  document.getElementById('jumpNote').innerHTML=`<b>规律</b>：① 逐位统计「上期→下期」的偏移量（跳 +0~+9，近期加权），取频率最高的跳跃得主推；② 用官方3D图 <b>0/1/2 路转移概率</b> 对候选加权修正；③ <b>差距修正</b>：回测最近 ${gap.bt} 期"跳跃推测 vs 实际"，算出逐位平均偏移（实际相对推测偏 +k），反哺下一期主推 +k（mod10），使规律随近期偏差自适应。最终主推 <b>${is3?mainCorr.join(''):mainCorr.join(' ')}</b>（窗口：${WIN_LABEL[state.win]}）。所有数值均为历史频率统计，<b>直选命中恒为 1/1000</b>，本卡不提高中奖概率，仅供娱乐参考。`;
+}
+
 /* ---------- 交互 ---------- */
 function buildTabs(){
   document.getElementById('tabs').innerHTML=Object.keys(GAMES).map(k=>
@@ -967,7 +1094,7 @@ function buildWinSel(){
     const b=document.createElement('button');
     b.className='wbtn'+(w===state.win?' active':'');
     b.textContent=WIN_LABEL[w];
-    b.onclick=()=>{ state.win=w; buildWinSel(); renderCards(); renderCombo(); renderHCW(); renderFive(); renderDFJ(); renderSmart(); };
+    b.onclick=()=>{ state.win=w; buildWinSel(); renderCards(); renderCombo(); renderHCW(); renderFive(); renderDFJ(); renderSmart(); renderJump(); };
     el.appendChild(b);
   });
 }
@@ -984,7 +1111,7 @@ function buildPickSel(){
 }
 function renderAll(){
   buildTabs(); buildWinSel(); buildPickSel();
-  renderCards(); renderCombo(); renderHCW(); renderFive(); renderDFJ(); renderSmart();
+  renderCards(); renderCombo(); renderHCW(); renderFive(); renderDFJ(); renderSmart(); renderJump();
   const a=allData();
   const extra = localCachedCount>0 ? `（含本地补充 ${localCachedCount} 条，已自动载入历史数据）` : '';
   document.getElementById('status').textContent=`已加载 ${g().name}：${a[0].code}(${a[0].day}) ~ ${a[a.length-1].code}(${a[a.length-1].day})，共 ${a.length} 期。点击右上角可刷新最新开奖。${extra}`;
