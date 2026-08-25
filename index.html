@@ -541,14 +541,14 @@ function fiveProbs(){
   }
   return {allHot:allHot/N, mix:mix/N, other:other/N, N, npos};
 }
-// 参考组合：以所选策略的「五码」为号码池，排列组合出全部 组六（三不同）与 组三（两同）号码
+// 参考组合：以「最新规律五码」为号码池，排列组合出全部 组六（三不同）与 组三（两同）号码
 function refCombos(){
-  const {groupA,groupB,groupC,hot,cold}=fiveSets();
+  const {hot,cold}=fiveSets();
   const npos=g().pos.length;
   if(npos!==3) return null;                 // 仅 3 位玩法（福彩3D / 排列三）
-  const pick=effectivePick();
-  const B = pick==='hot'?groupA : pick==='cold'?groupC : groupB;   // 跟随策略选择（自动=温度概率最高）
-  const label = pick==='hot'?'全热五码' : pick==='cold'?'全冷五码':'冷热搭配五码';
+  const jf=jumpFive();
+  const B = jf.five;                         // 最新规律五码（位数跳跃 + 差距修正）
+  const label = '最新规律五码';
   const hotSet=new Set(B.filter(x=>hot.includes(x)));
   const coldSet=new Set(B.filter(x=>cold.includes(x)));
   // 上一期开奖（用于排除回声：刚开出的号码不再列入参考组合）
@@ -569,28 +569,13 @@ function refCombos(){
       if(i===j) continue;
       const c=[B[i],B[i],B[j]]; if(!excl(c)) z3.push(c);
     }
-  return {group:B, z6, z3, hotSet, coldSet, pick, label, lastExcluded: ldSorted};
+  return {group:B, z6, z3, hotSet, coldSet, label, lastExcluded: ldSorted};
 }
 function renderFive(){
-  const s=fiveSets();
   const jf=jumpFive();                                   // 最新规律（跳跃+差距修正）五码
   const npos=g().pos.length, is3=npos===3;
   const chip=(v,kind)=>`<span class="chip ${kind}" style="font-size:17px;font-weight:700;min-width:30px;text-align:center">${v}</span>`;
-  const chipsA=s.groupA.map(v=>chip(v,'hot')).join('');
-  const chipsB=s.groupB.map(v=>chip(v, s.hot.includes(v)?'hot':'cold')).join('');
-  const chipsC=s.groupC.map(v=>chip(v,'cold')).join('');
-  const pr=fiveProbs();
-  const pct=n=>(n*100).toFixed(1)+'%';
-  // 全热 / 冷热搭配 / 其他 概率面板（用户要求的"更精准推测"依据）
-  const probHtml=`<div class="block" style="margin-top:12px">
-    <div class="t">下一期形态概率（基于「${WIN_LABEL[state.win]}」样本 · ${pr.N} 期 · 热号=${s.hot.join('、')}）</div>
-    <div class="pie3">
-      <div class="p zz"><b>${pct(pr.allHot)}</b>全热<br>（${pr.npos}位皆热号）</div>
-      <div class="p zs"><b>${pct(pr.mix)}</b>冷热搭配<br>（含热+含冷）</div>
-      <div class="p bz"><b>${pct(pr.other)}</b>其他<br>（含温号等）</div>
-    </div>
-    <div class="note" style="margin-top:6px">「全热」=开奖 ${pr.npos} 个数字全部落在热号池的概率；「冷热搭配」=同时含热号与冷号（最常见）；「其他」=含温号或全冷等。可据此判断该侧重全热还是冷热混合。仅供娱乐参考，不保证中奖。</div>
-  </div>`;
+  // 五码预测已统一为最新规律（位数跳跃 + 差距修正），不再展示 全热/冷热搭配/全冷 温度分组及其形态概率面板
   // 组三/组六/豹子 形态概率（基于当前窗口样本）
   let shapeHtml;
   if(is3){
@@ -611,7 +596,7 @@ function renderFive(){
   } else {
     shapeHtml=`<div class="block" style="margin-top:12px"><div class="note">组三 / 组六 与 全热/冷热 形态概率仅适用于 3 位玩法（福彩3D / 排列三）；排列五为 5 位玩法，不参与此项推算，仅作号码参考。</div></div>`;
   }
-  // 参考组合：冷热搭配五码 → 全部 组六 / 组三 号码
+  // 参考组合：最新规律五码 → 全部 组六 / 组三 号码
   let refHtml;
   const rc=refCombos();
   if(rc){
@@ -625,23 +610,20 @@ function renderFive(){
       <div style="display:flex;flex-wrap:wrap;gap:6px">${z6Html}</div>
       <div style="margin:12px 0 3px;font-size:12px;color:var(--sub)">组三（两同一异）· 共 <b>${rc.z3.length}</b> 注，每注覆盖 3 个直选排列</div>
       <div style="display:flex;flex-wrap:wrap;gap:6px">${z3Html}</div>
-      <div class="note" style="margin-top:8px">以上由「${rc.label}（${rc.group.join('、')}）」排列组合得出：任取 3 个不同号得<b>组六</b>，取 1 码重复 + 1 不同号得<b>组三</b>。<b style="color:var(--hot)">红=热号</b>，<b style="color:var(--cold)">蓝=冷号</b>。若当期开奖 3 个号码<b>全部落在上述 5 码内</b>，即中对应组选。跟随顶部「策略」切换可换用 全热 / 冷热搭配 / 全冷 三种思路。<b style="color:var(--red)">已自动剔除上一期开奖号码（回声排除），避免出现刚开出的组合。</b>仅供娱乐参考，不保证中奖。</div>
+      <div class="note" style="margin-top:8px">以上由「${rc.label}（${rc.group.join('、')}）」排列组合得出：任取 3 个不同号得<b>组六</b>，取 1 码重复 + 1 不同号得<b>组三</b>。若当期开奖 3 个号码<b>全部落在上述 5 码内</b>，即中对应组选。<b style="color:var(--red)">已自动剔除上一期开奖号码（回声排除），避免出现刚开出的组合。</b>号码池即上方「最新规律五码」，随位数跳跃+差距修正每日更新。仅供娱乐参考，不保证中奖。</div>
     </div>`;
   } else {
     refHtml=`<div class="block" style="margin-top:12px"><div class="note">参考组合仅适用于 3 位玩法（福彩3D / 排列三）；排列五为 5 位玩法，不参与此项推算。</div></div>`;
   }
   document.getElementById('fiveBox').innerHTML=`<div class="pred" style="grid-column:1/-1">
-    <h3 style="margin:0 0 8px;font-size:15px">${is3?'五选三 · 组选复试（两组号码）':'五码热号池（两组参考）'}</h3>
-    <div style="margin-bottom:10px"><div class="note" style="margin-bottom:6px">① 全热五码（近期最热 5 个）</div><div class="chip-row" style="gap:6px">${chipsA}</div></div>
-    <div style="margin-bottom:10px"><div class="note" style="margin-bottom:6px">② 冷热搭配五码（3 热 + 2 冷，冷号取当前遗漏最大）</div><div class="chip-row" style="gap:6px">${chipsB}</div></div>
-    <div><div class="note" style="margin-bottom:6px">③ 全冷五码（当前遗漏最大 5 个，纯冷号）</div><div class="chip-row" style="gap:6px">${chipsC}</div></div>
-    <div style="margin-top:10px"><div class="note" style="margin-bottom:6px">④ <b style="color:#1b5fbf">最新规律五码</b>（位数跳跃 + 近 ${BACKTEST_N} 期差距修正 · 每日主推来源）· 主推 <b style="color:#1b5fbf">${is3?jf.main.join(''):jf.main.join(' ')}</b></div><div class="chip-row" style="gap:6px">${jf.five.map(v=>chip(v,'jmp')).join('')}</div></div>
-    ${probHtml}${refHtml}${shapeHtml}</div>`;
+    <h3 style="margin:0 0 8px;font-size:15px">${is3?'五选三 · 组选复试（最新规律五码）':'最新规律五码（每日主推来源）'}</h3>
+    <div style="margin-bottom:10px"><div class="note" style="margin-bottom:6px"><b style="color:#1b5fbf">最新规律五码</b>（位数跳跃 + 近 ${BACKTEST_N} 期差距修正 · 每日主推来源）· 主推 <b style="color:#1b5fbf">${is3?jf.main.join(''):jf.main.join(' ')}</b></div><div class="chip-row" style="gap:6px">${jf.five.map(v=>chip(v,'jmp')).join('')}</div></div>
+    ${refHtml}${shapeHtml}</div>`;
   let note;
   if(is3){
-    note=`给出 <b>四组各 5 个号码</b>：① 全热 ${s.groupA.join('、')}；② 冷热搭配 ${s.groupB.join('、')}（3 热 + 2 冷）；③ 全冷 ${s.groupC.join('、')}；④ <b style="color:#1b5fbf">最新规律五码 ${jf.five.join('、')}</b>（位数跳跃 + 近 ${BACKTEST_N} 期差距修正，每日主推来源，主推 ${jf.main.join('')}）。前 3 组按「五选三 · 组选复试」每组从 5 个号任取 3 个，各 <b>C(5,3)=10</b> 注；④ 跟随每日主推规律。只要当期开奖 3 个号<b>全部落在某一组 5 码内</b>即中组选。当前窗口「全热」概率 <b>${pct(pr.allHot)}</b>、「冷热搭配」概率 <b>${pct(pr.mix)}</b>。仅供娱乐参考，不保证中奖。`;
+    note=`<b>最新规律五码 ${jf.five.join('、')}</b>（位数跳跃 + 近 ${BACKTEST_N} 期差距修正，每日主推来源，主推 ${jf.main.join('')}）。按「五选三 · 组选复试」从这 5 个号任取 3 个，<b>C(5,3)=10</b> 注全组选覆盖（见下方参考组合）；只要当期开奖 3 个号<b>全部落在 5 码内</b>即中组选。下方附「组三 / 组六」形态概率供参考。仅供娱乐参考，不保证中奖。`;
   } else {
-    note=`排列五为 5 位玩法，「五选三」组选概念适用于 3 位玩法（福彩3D / 排列三）。这里给出参考号码：① 全热 ${s.groupA.join('、')}；② 冷热搭配 ${s.groupB.join('、')}（3 热 + 2 冷）；③ 全冷 ${s.groupC.join('、')}；④ <b style="color:#1b5fbf">最新规律五码 ${jf.five.join('、')}</b>（主推 ${jf.main.join(' ')}），可作选号参考。请理性购彩。`;
+    note=`<b style="color:#1b5fbf">最新规律五码 ${jf.five.join('、')}</b>（主推 ${jf.main.join(' ')}）作选号参考；附「组三 / 组六」形态概率。请理性购彩。`;
   }
   document.getElementById('fiveNote').innerHTML=note;
 }
