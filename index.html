@@ -298,6 +298,9 @@ const UA = "Mozilla/5.0";
 
 let state = { game: Object.keys(GAMES)[0], win: 56, pick: 'auto' };
 
+// 部署版本号：每次部署由 deploy.py 自动改写，用于手机"主屏幕"缓存自愈
+const BUILD = '20260829082441';
+
 /* ---------- 数据访问 ---------- */
 function g(){ return GAMES[state.game]; }
 function allData(){ return g().data; }
@@ -1521,6 +1524,20 @@ loadStored();
 renderAll();
 setAuto(true);                 // 开启自动更新（后台每 30 分钟刷新）
 setTimeout(()=>{ refresh(true); }, 1500);  // 打开页面即自动拉取最新开奖
+
+/* ---------- 手机"添加到主屏幕"缓存自愈：版本不符则强制刷新整页 ---------- */
+function checkUpdate(){
+  try{
+    fetch('meta.json?_='+Date.now(), {cache:'no-store'})
+      .then(r=>r.ok?r.json():null)
+      .then(j=>{
+        if(!j||!j.v) return;
+        if(j.v!==BUILD){ location.href = location.pathname + '?_=' + j.v; }
+      })
+      .catch(()=>{});
+  }catch(e){}
+}
+checkUpdate();
 </script>
 </body>
 </html>
