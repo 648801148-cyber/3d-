@@ -43,6 +43,17 @@ header .sub{color:var(--sub);font-size:12px}
 .auto{padding:8px 14px;border-radius:10px;border:1px solid #2f9e44;background:#eaf6ec;color:#2f9e44;cursor:pointer;font-size:13px;font-weight:600}
 .auto.on{background:#2f9e44;color:#fff}
 .status{font-size:12px;color:var(--sub);margin:4px 2px}
+.latest{background:linear-gradient(180deg,#fffdf6,#fbf4e6);border:1px solid #ecd9a8;border-radius:14px;padding:14px 16px;margin:10px 0;box-shadow:0 2px 10px rgba(180,140,40,.08)}
+.latest-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.latest-game{font-size:13px;font-weight:700;color:#a9791b}
+.latest-period{font-size:16px;font-weight:800;color:var(--ink)}
+.latest-date{font-size:12px;color:var(--sub)}
+.latest-balls{display:flex;gap:8px;margin:10px 0 6px}
+.latest-balls .ball{width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;color:#fff;background:radial-gradient(circle at 32% 28%,#ff9a5a,#e2532a);box-shadow:0 2px 6px rgba(210,80,30,.35)}
+.latest-meta{display:flex;gap:16px;flex-wrap:wrap;font-size:12.5px;color:var(--sub)}
+.latest-meta b{color:var(--ink);font-size:13.5px}
+.latest-next{margin-top:8px;font-size:13px;color:#5a3ea8}
+.latest-next b{font-size:14.5px}
 .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:12px 0}
 .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px}
 .card .k{font-size:12px;color:var(--sub)}
@@ -232,6 +243,8 @@ footer{margin-top:24px;font-size:11.5px;color:var(--sub);line-height:1.7;border-
   </div>
   <div class="status" id="status">数据加载中…</div>
 
+  <div class="latest" id="latestBox"></div>
+
   <div class="maintabs" id="maintabs">
     <button class="mtab active" id="tabDFJ">🎯 大师推荐</button>
     <button class="mtab" id="tabNight">🌙 晚上大师推荐</button>
@@ -297,6 +310,32 @@ function winData(){
   return state.win===0 ? a : a.slice(-state.win);
 }
 function lastRec(){ const a=allData(); return a[a.length-1]; }
+function renderLatest(){
+  const a=allData(); if(!a.length) return;
+  const last=a[a.length-1];
+  const d=last.d||[];
+  const sum=d.reduce((s,x)=>s+x,0);
+  const odd=d.filter(x=>x%2).length;
+  const big=d.filter(x=>x>=5).length;
+  const next=g().next;
+  const liveNext = next && String(next.next_code) > String(last.code);
+  const nextCode = liveNext ? String(next.next_code) : String(Number(last.code)+1);
+  const nextStr = nextCode + (liveNext && next.next_open_time ? (' · 开奖 '+String(next.next_open_time).slice(5)) : (liveNext?'':'（联网刷新显示精确开奖时间）'));
+  const balls=d.map(n=>`<span class="ball">${n}</span>`).join('');
+  document.getElementById('latestBox').innerHTML=
+    `<div class="latest-head">
+       <span class="latest-game">${g().name}</span>
+       <span class="latest-period">第 ${last.code} 期</span>
+       <span class="latest-date">${last.day||''}</span>
+     </div>
+     <div class="latest-balls">${balls}</div>
+     <div class="latest-meta">
+       <span>和值 <b>${sum}</b></span>
+       <span>奇偶 <b>${odd}奇${d.length-odd}偶</b></span>
+       <span>大小 <b>${big}大${d.length-big}小</b></span>
+     </div>
+     <div class="latest-next">下一期：<b>${nextStr}</b></div>`;
+}
 
 /* ---------- 本地持久化：刷新结果补充进历史数据，跨刷新保留 ---------- */
 let localCachedCount=0;
@@ -1431,6 +1470,7 @@ function renderHistoryDetail(){
 function renderAll(){
   buildTabs(); buildWinSel(); buildPickSel();
   renderDFJ(); renderMasters(); renderRank(); renderAI();
+  renderLatest();
   const a=allData();
   const extra = localCachedCount>0 ? `（含本地补充 ${localCachedCount} 条，已自动载入历史数据）` : '';
   document.getElementById('status').textContent=`已加载 ${g().name}：${a[0].code}(${a[0].day}) ~ ${a[a.length-1].code}(${a[a.length-1].day})，共 ${a.length} 期。点击右上角可刷新最新开奖。${extra}`;
