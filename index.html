@@ -172,6 +172,31 @@ footer{margin-top:24px;font-size:11.5px;color:var(--sub);line-height:1.7;border-
 .chip-s{display:inline-block;background:var(--chip);border-radius:6px;padding:1px 7px;margin:1px;font-size:12px;font-variant-numeric:tabular-nums}
 .chip-s.hot{color:var(--hot);background:#fdeaea}
 .chip-s.cold{color:var(--cold);background:#e8f0fd}
+.rank-box{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+.rank-card{background:linear-gradient(180deg,#fff,#f7fbff);border:1px solid #d3e3f6;border-radius:12px;padding:12px 14px}
+.rank-card h3{margin:0 0 2px;font-size:14.5px;color:#1b5fbf}
+.rank-card .src{font-size:11.5px;color:var(--sub);margin-bottom:8px}
+.rank-card .rate{font-size:24px;font-weight:800;color:var(--red);font-variant-numeric:tabular-nums}
+.rank-card .detail{font-size:12px;color:var(--sub);margin:4px 0 6px}
+.rank-card a{font-size:11px;color:#1b5fbf;text-decoration:none}
+.block{margin-top:14px}
+.block .t{font-size:12.5px;color:var(--sub);margin-bottom:6px}
+.hist-list{display:flex;flex-direction:column;gap:8px}
+.hist-card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer;transition:border-color .15s}
+.hist-card:hover{border-color:#9cc2f0}
+.hist-card.active{border-color:var(--blue);box-shadow:0 0 0 2px rgba(27,95,191,.12)}
+.h-top{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:13px;margin-bottom:4px}
+.h-rel{font-size:11px;color:#fff;background:var(--blue);border-radius:6px;padding:1px 6px}
+.h-game{font-size:11.5px;color:var(--sub)}
+.h-win{font-size:11px;color:var(--sub);margin-left:auto}
+.h-sum{font-size:12.5px;color:var(--ink);line-height:1.7}
+.h-sum b{color:var(--red);font-variant-numeric:tabular-nums}
+.cmp{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+.cmp-col{background:#fafbff;border:1px solid #e2e8f4;border-radius:12px;padding:12px}
+.cmp-h{font-size:13.5px;font-weight:700;color:var(--blue);margin-bottom:8px}
+.cmp-sub{font-size:12.5px;color:var(--sub);margin-top:8px;line-height:1.7}
+.cmp-sub b{color:var(--ink);font-variant-numeric:tabular-nums}
+@media(max-width:640px){ .cmp{grid-template-columns:1fr} }
 .dims b{color:var(--ink);font-variant-numeric:tabular-nums}
 .note-inline{background:#fff8ef;border:1px solid #f0d9bf;color:#7a5a2a;font-size:12px;border-radius:8px;padding:6px 9px;margin-top:8px}
 .bt{display:flex;flex-wrap:wrap;gap:6px}
@@ -179,13 +204,17 @@ footer{margin-top:24px;font-size:11.5px;color:var(--sub);line-height:1.7;border-
 .bt-row.hit{border-color:var(--hot);color:var(--hot);font-weight:700}
 .bt-sum{margin-top:8px;font-size:13px;color:#556;line-height:1.6}
 .chip.jmp{background:linear-gradient(180deg,#eaf3ff,#d4e6ff);border-color:#9cc2f0;color:#1b5fbf}
+.maintabs{display:flex;gap:10px;margin:16px 0 4px}
+.mtab{flex:1;padding:11px 14px;border:1px solid var(--line);border-radius:10px;background:#fff;font-size:14.5px;font-weight:600;color:var(--sub);cursor:pointer;transition:all .15s;font-family:inherit}
+.mtab.active{color:#fff;background:#5a3ea8;border-color:#5a3ea8;box-shadow:0 2px 8px rgba(90,62,168,.25)}
+.mtab:not(.active):hover{border-color:#9cc2f0;color:var(--ink)}
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
-    <h1>🎯 彩票分析工作台</h1>
-    <div class="sub">福彩3D · 体彩排列三 · 体彩排列五 — 分位统计 / 形态规律 / 下一期参考</div>
+    <h1>🎯 大师推荐</h1>
+    <div class="sub">福彩3D · 体彩排列三 — 独飞精 师傅格式 · 每日主推（仅 3 位玩法）</div>
     <div class="banner">⚠️ <b>理性购彩提醒</b>：以上玩法均为独立随机事件，每期开奖互不影响，<b>历史无法预测未来</b>。本工作台的"规律/预测"仅为描述性统计，<b>仅供研究、学习、娱乐参考，不构成任何中奖保证或购彩建议</b>。请量力而行。</div>
   </header>
 
@@ -193,6 +222,7 @@ footer{margin-top:24px;font-size:11.5px;color:var(--sub);line-height:1.7;border-
     <div class="tabs" id="tabs"></div>
     <button class="refresh" id="refreshBtn">🔄 刷新最新开奖</button>
     <button class="auto on" id="autoBtn">🔁 自动更新：开</button>
+    <button class="refresh" id="histBtn">📅 历史推荐</button>
     <div class="win-sel" id="winSel">
       <span>样本窗口</span>
     </div>
@@ -202,63 +232,46 @@ footer{margin-top:24px;font-size:11.5px;color:var(--sub);line-height:1.7;border-
   </div>
   <div class="status" id="status">数据加载中…</div>
 
-  <div class="cards" id="cards"></div>
+  <div class="maintabs" id="maintabs">
+    <button class="mtab active" id="tabDFJ">🎯 大师推荐</button>
+    <button class="mtab" id="tabNight">🌙 晚上大师推荐</button>
+  </div>
 
-  <section>
-    <h2>组合 / 形态分析</h2>
-    <div id="comboBox"></div>
-  </section>
-
-  <section>
-    <h2>🔥❄️ 冷热温号规律 · 下一期数字概率 · 五组精选号</h2>
-    <div id="hcwBox"></div>
-  </section>
-
-  <section>
-    <h2>五码预测（五选三 · 组选复试）</h2>
-    <div class="pred-grid" id="fiveBox"></div>
-    <div class="note" id="fiveNote" style="margin-top:8px"></div>
-  </section>
-
-  <section>
-    <h2>独飞精 · 胆码推荐（师傅格式）</h2>
+  <section id="secDFJ">
+    <h2>🎯 大师推荐 · 独飞精（师傅格式 · 每日主推）</h2>
     <div class="dfj" id="dfjBox"></div>
     <div class="note" id="dfjNote" style="margin-top:8px"></div>
   </section>
 
-  <section>
-    <h2>🎯 智能最高概率推荐（全热 / 全冷 / 冷热搭配 · 概率最高者）</h2>
-    <div class="pred" id="smartBox"></div>
-    <div class="note" id="smartNote" style="margin-top:8px"></div>
-  </section>
-
-  <section>
-    <h2>📐 位数跳跃规律 · 官方3D图综合分析（每日主推）</h2>
-    <div class="pred" id="jumpBox"></div>
-    <div class="note" id="jumpNote" style="margin-top:8px"></div>
-  </section>
-
-  <section>
-    <h2>🧙 网上大师推荐 + 🤖 AI 选号小助手</h2>
-    <div class="note" style="margin:6px 0 10px">本区把<b>网上公开的大师预测</b>与<b>本工具规律</b>汇总，并提供一个能对话的 AI 小助手。所有内容均为公开观点摘录与历史频率统计，<b>不提高中奖概率</b>，仅供娱乐参考。</div>
-    <h3 style="font-size:14px;margin:6px 0">① 网上大师推荐（230期 · 2026-08-28，摘录自公开预测，可点原帖核对）</h3>
+  <section id="secNight" style="display:none">
+    <h2>🧙 晚上大师推荐 + 🤖 AI 选号小助手</h2>
+    <div class="note" style="margin:6px 0 10px">本区汇总<b>网上公开的大师预测</b>与<b>本站规律</b>，并提供一个能对话的 AI 小助手。所有内容均为公开观点摘录与历史频率统计，<b>不提高中奖概率</b>，仅供娱乐参考。<b>关于"命中率"：</b>各预测站点自报的"X中Y"多为"胆码命中（推荐数字出现在开奖号中）"，并非购彩中奖率，且未经独立核验。</div>
+    <h3 style="font-size:14px;margin:6px 0">① 近期网上大师公开推荐（来源可点原帖核对）</h3>
     <div id="masterBox"></div>
-    <h3 style="font-size:14px;margin:14px 0 6px">② 🤖 AI 综合建议（本工具规律主推 × 大师共识）</h3>
+    <h3 style="font-size:14px;margin:14px 0 6px">② 🏆 命中率较高大师排行（摘录自 3dzhan.net / cjcp.cn，仅供参考）</h3>
+    <div id="rankBox"></div>
+    <h3 style="font-size:14px;margin:14px 0 6px">③ 🤖 AI 综合建议（本站规律主推 × 大师共识）</h3>
     <div class="ai-advice" id="aiAdviceBox"></div>
-    <h3 style="font-size:14px;margin:14px 0 6px">③ 和 AI 小助手聊聊（问：热号 / 大师推荐 / 下一期 / 中奖率）</h3>
+    <h3 style="font-size:14px;margin:14px 0 6px">④ 和 AI 小助手聊聊（问：命中率高的有哪些 / 大师推荐什么 / 热号 / 下一期 / 中奖率）</h3>
     <div class="chat">
       <div class="chat-log" id="aiLog"></div>
       <div class="chat-input">
-        <input id="aiInput" placeholder="例如：大师推荐什么？ / 热号有哪些？ / 下一期怎么选？" />
+        <input id="aiInput" placeholder="例如：命中率高的有哪些大师？ / 大师推荐什么？ / 热号有哪些？" />
         <button id="aiSend">发送</button>
       </div>
     </div>
   </section>
 
+  <section id="histSection" style="display:none">
+    <h2>📅 历史推荐（本地保存 · 可对比）</h2>
+    <div class="note" style="margin:6px 0 10px">每次打开/刷新页面，本工具会把<b>当天推荐</b>（大师推荐 + 大师共识 + AI 综合五码）按日期存到本机浏览器。点下方任意一天即可<b>查看当时推荐</b>并与<b>今日</b>并排对比——方便你明天回看今天的推荐、验证命中情况。数据仅存于本机，不上传。</div>
+    <div id="histBox"></div>
+  </section>
+
   <footer>
     <div>数据来源：中彩网公开开奖接口（api.huiniao.top），抓取时间见顶部状态。本页为单文件离线应用，数据已内嵌。</div>
-    <div>统计口径：频率/冷热基于所选「样本窗口」；当前遗漏与最大遗漏基于全量历史；预测综合热号追踪、冷号回补、邻号延伸、均值四类思路。</div>
-    <div>概率提示：3 位直选命中恒为 1/1000，5 位直选命中恒为 1/100000。任何分析都不能提高中奖概率。</div>
+    <div>统计口径：频率/冷热基于所选「样本窗口」；当前遗漏与最大遗漏基于全量历史。大师推荐采用独飞精 师傅格式，结合位数跳跃规律与差距修正。</div>
+    <div>概率提示：3 位直选命中恒为 1/1000。任何分析都不能提高中奖概率，仅供娱乐参考。</div>
   </footer>
 </div>
 
@@ -992,8 +1005,8 @@ function renderDFJ(){
   const today=new Date();
   const dateStr=`${today.getFullYear()}.${String(today.getMonth()+1).padStart(2,'0')}.${String(today.getDate()).padStart(2,'0')}`;
   if(!r){
-    document.getElementById('dfjBox').innerHTML=`<div class="dfj-empty">独飞精格式仅适用于 3 位玩法（福彩3D / 排列三）；当前为 ${g().name}（${npos} 位），请切换至 3 位玩法查看。</div>`;
-    document.getElementById('dfjNote').innerHTML='排列五为 5 位玩法，「独/飞/精/直/对」概念按师傅格式主要服务于 3 位组选号码生成。';
+    document.getElementById('dfjBox').innerHTML=`<div class="dfj-empty">大师推荐（独飞精格式）仅适用于 3 位玩法（福彩3D / 排列三）；当前为 ${g().name}（${npos} 位），请切换至 3 位玩法查看。</div>`;
+    document.getElementById('dfjNote').innerHTML='排列五为 5 位玩法，「独/飞/精/直/对」为大师推荐所采用的师傅格式，主要服务于 3 位组选号码生成。';
     return;
   }
   const hotSet=r.hotSet, coldSet=r.coldSet;          // 全局热/冷集合，用于给每个数字上色
@@ -1101,23 +1114,30 @@ function jumpFive(){
   return {five, main:jm.main, raw:jm.raw, corr:jm.corr, bt:jm.bt};
 }
 /* ---------- 网上大师推荐 + AI 小助手 ---------- */
-// 本期（230期 · 2026-08-28）网上公开大师预测摘录（真实来源，仅供娱乐参考）
+// 近期网上公开大师预测摘录（真实来源，链接指向原帖，可自行核对；仅供娱乐参考）
 const MASTERS=[
-  {m:'刘科',src:'新浪体育',period:230,date:'2026-08-28',single:'1',dbl:'1、8',kill:'6',
-   direct:'01589 × 12589 × 23478',g6:'134789',pick:'918',
-   url:'https://sports.sina.com.cn/l/2026-08-28/doc-inipvrtx8983251.shtml'},
-  {m:'暗皇',src:'新浪体育',period:230,date:'2026-08-28',single:'9',dbl:'4、9',kill:'2',
-   direct:'04678 × 01489 × 01459',g6:'013479',pick:'490',
-   url:'https://sports.sina.com.cn/l/2026-08-28/doc-inipvrue0244201.shtml'},
-  {m:'妲己定胆',src:'一定牛',period:230,date:'2026-08-28',single:'9',dbl:'5、6',kill:'',
-   direct:'百9 / 十2、9 / 个8、9',g6:'',pick:'',
-   url:'https://www.ydniu.com/info/sd/zjtj/397620260828.html'},
-  {m:'水漫金山',src:'一定牛',period:230,date:'2026-08-28',single:'1',dbl:'',kill:'',
-   direct:'百1 / 十3 / 个2',g6:'组六20注(见原帖)',pick:'',
-   url:'https://www.ydniu.com/info/sd/cpyc/127420260827.html'},
-  {m:'3D拆解',src:'今日头条',period:230,date:'2026-08-28',single:'2',dbl:'8、5',kill:'7',
-   direct:'百3/8/5/0 × 十2/5/9/0 × 个8/2/5/0',g6:'',pick:'328、525、852、358、802',
-   url:'https://www.toutiao.com/a7678746439534658071'},
+  {m:'神运加持',src:'一定牛',period:228,date:'2026-08-26',single:'5',dbl:'3、5',kill:'1、6、4',
+   direct:'0249 × 3789 × 0258',g6:'023459',pick:'592',
+   url:'https://m.ydniu.com/info/sd/cpyc/209220260826.html'},
+  {m:'蓝狮',src:'一定牛',period:228,date:'2026-08-26',single:'1',dbl:'1、5',kill:'',
+   direct:'百137 / 十1457 / 个357',g6:'12457',pick:'',
+   url:'https://www.ydniu.com/info/sd/zjtj/401120260826.html'},
+  {m:'北斗·3D之家',src:'今日头条',period:228,date:'2026-08-26',single:'6',dbl:'2、8',kill:'',
+   direct:'六码023678 · 定位6**/**8/**2',g6:'023678',pick:'682、370、627、827、277、288、736、636、806、886',
+   url:'https://www.toutiao.com/article/7678160393478423076'},
+  {m:'紫云涧',src:'一定牛',period:229,date:'2026-08-27',single:'0',dbl:'0、3',kill:'5',
+   direct:'01246 × 01378 × 34670',g6:'012346',pick:'003',
+   url:'https://www.ydniu.com/info/sd/zjtj/549620260827.html'},
+];
+// 命中率较高大师排行（摘录自 3dzhan.net / cjcp.cn 公开榜单；"命中率"=站点自报的「胆码命中」，
+// 即推荐数字出现在开奖号中，并非购彩中奖率，且未经独立核验，仅供参考）
+const RANKINGS=[
+  {m:'胆王',src:'3dzhan.net',rate:'86%',detail:'15中13（独胆/双胆）',url:'https://www.3dzhan.net/yuce/ZhuanjiaGroup.aspx?typeid=1'},
+  {m:'决明子',src:'3dzhan.net',rate:'80%',detail:'15中12',url:'https://www.3dzhan.net/yuce/ZhuanjiaGroup.aspx?typeid=1'},
+  {m:'东海彩子',src:'3dzhan.net',rate:'73%',detail:'15中11',url:'https://www.3dzhan.net/yuce/ZhuanjiaGroup.aspx?typeid=1'},
+  {m:'江南才子',src:'3dzhan.net',rate:'73%',detail:'15中11',url:'https://www.3dzhan.net/yuce/ZhuanjiaGroup.aspx?typeid=1'},
+  {m:'第五春晖',src:'cjcp.cn',rate:'63%',detail:'30中19',url:'https://ssc.cjcp.cn/3d/'},
+  {m:'赫连浩广',src:'cjcp.cn',rate:'53%',detail:'30中16',url:'https://ssc.cjcp.cn/3d/'},
 ];
 function masterDigits(m){
   const dig=s=>(s||'').replace(/[^0-9]/g,'').split('').map(Number);
@@ -1151,10 +1171,16 @@ function aiAnswer(qRaw){
   const {hot,cold}=fiveSets(); const jm=jumpRule(); const cons=masterConsensus();
   const chip=d=>chipD(d);
   const consChips=cons.ranked.slice(0,6).map(d=>chip(d)+`(${cons.score[d]})`).join(' ');
+  if(/命中率|准确率|排行|榜单|胜率|大师.*(高|准|排行|中奖率|命中率)|(哪个|哪些|有没有).*大师/.test(q)){
+    let s='🏆 网上公开榜单里"胆码命中率"较高的几位（来源 3dzhan.net / cjcp.cn，站点自报，<b>非购彩中奖率</b>，未经独立核验）：\n';
+    RANKINGS.slice(0,6).forEach(r=>{ s+=`· ${r.m}（${r.src}）：自报命中 ${r.rate}（${r.detail}）\n`; });
+    s+='\n⚠️ 这类"命中率"指"推荐数字出现在开奖号中"，和真实购彩中奖率（直选 1/1000、组选约 1/167）完全不同，且数据未经独立核验。任何大师都不能提高真实中奖概率，仅供参考。\n想看他们具体推荐什么，问我"大师推荐什么"。';
+    return s;
+  }
   if(/概率|中奖率|命中|包中|稳中|百分百|必中|提高/.test(q))
     return '先说清楚：3 位直选（福彩3D/排列三）真实命中概率恒为 1/1000，5 位为 1/100000。任何大师、AI 或规律分析都<b>不能</b>提高这个概率——开奖是独立随机事件。\n我能做的是把"历史频率规律 + 大师公开观点"汇总，帮你少漏看、做参考，但本质是娱乐。理性购彩，量力而行。';
   if(/大师|网上|推荐|别人|专家|高手/.test(q)){
-    let s='📋 本期（230期）网上大师公开推荐摘录：\n';
+    let s='📋 近期网上大师公开推荐摘录：\n';
     MASTERS.forEach(m=>{ s+=`· ${m.m}（${m.src}）：独胆 ${m.single||'—'}`+(m.dbl?`，双胆 ${m.dbl}`:'')+(m.kill?`，杀 ${m.kill}`:'')+(m.pick?`，单挑 ${m.pick}`:'')+'\n'; });
     s+=`\n🔢 大师共识码（数字后=被推荐强度）：${consChips}\n共识最强：${cons.top.map(chip).join(' ')}。可作参考，但同样不保证中奖。`;
     return s;
@@ -1220,6 +1246,18 @@ function renderAI(){
     document.getElementById('aiSend').onclick=send;
   }
   paintAILog();
+}
+
+function renderRank(){
+  const el=document.getElementById('rankBox'); if(!el) return;
+  const cards=RANKINGS.map(r=>`<div class="rank-card">
+    <h3>${r.m}</h3><div class="src">来源：${r.src}</div>
+    <div class="rate">${r.rate}</div>
+    <div class="detail">${r.detail}（站点自报，胆码命中）</div>
+    <a href="${r.url}" target="_blank" rel="noopener">查看原榜单 ↗</a>
+  </div>`).join('');
+  el.innerHTML=`<div class="rank-box">${cards}</div>
+    <div class="note-inline">⚠️ 以上"命中率"为各预测站点自报的<b>胆码命中率</b>（推荐数字出现在开奖号中），并非购彩中奖率，且未经独立核验。3D 直选真实中奖率恒为 1/1000，组选约 1/167，任何大师/AI 都不能提高这一概率。请理性购彩。</div>`;
 }
 
 function renderJump(){
@@ -1291,7 +1329,7 @@ function buildWinSel(){
     const b=document.createElement('button');
     b.className='wbtn'+(w===state.win?' active':'');
     b.textContent=WIN_LABEL[w];
-    b.onclick=()=>{ state.win=w; buildWinSel(); renderCards(); renderCombo(); renderHCW(); renderFive(); renderDFJ(); renderSmart(); renderJump(); renderMasters(); renderAI(); };
+    b.onclick=()=>{ state.win=w; buildWinSel(); renderDFJ(); };
     el.appendChild(b);
   });
 }
@@ -1302,16 +1340,101 @@ function buildPickSel(){
     const b=document.createElement('button');
     b.className='wbtn'+(p===state.pick?' active':'');
     b.textContent=PICK_LABEL[p];
-    b.onclick=()=>{ state.pick=p; buildPickSel(); renderFive(); renderDFJ(); renderSmart(); };
+    b.onclick=()=>{ state.pick=p; buildPickSel(); renderDFJ(); };
     el.appendChild(b);
   });
 }
+/* ---------- 历史推荐（本地保存 + 对比） ---------- */
+const HIST_KEY='lh_rec_history';
+function loadHistory(){
+  try{ const a=JSON.parse(localStorage.getItem(HIST_KEY)); return Array.isArray(a)?a:[]; }catch(e){ return []; }
+}
+function saveSnapshot(){
+  const game=g().name;
+  const today=new Date();
+  const ds=`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+  const win=winData(); const last=win[win.length-1];
+  const r=duFeiJing();
+  const cons=masterConsensus();
+  const a=aiAdvice();
+  const snap={
+    genDate:ds, game, win:state.win, pick:state.pick,
+    lastDraw: last? {code:last.code, day:last.day, d:last.d}:null,
+    dfj: r? {jmMain:r.jmMain, du:r.du, fei:r.fei, jing:r.jing, si:r.si, wu:r.wu, liu:r.liu, zhi:r.zhi, dui:r.dui, pickLabel:r.pickLabel}:null,
+    masters: MASTERS.map(m=>({m:m.m,src:m.src,single:m.single,dbl:m.dbl,kill:m.kill,pick:m.pick})),
+    consensusTop: cons.top, consensusRanked: cons.ranked,
+    aiFive: a.five
+  };
+  let h=loadHistory();
+  h=h.filter(x=>!(x.genDate===ds && x.game===game));   // 同日同玩法覆盖
+  h.unshift(snap);
+  if(h.length>60) h=h.slice(0,60);
+  try{ localStorage.setItem(HIST_KEY, JSON.stringify(h)); }catch(e){}
+}
+function dfjCompact(dfj){
+  if(!dfj) return '<div class="dfj-empty">该日非 3 位玩法，无独飞精推荐</div>';
+  const pair=v=>`<span class="pair">${v}</span>`;
+  return `<div class="dfj" style="padding:0;border:none;box-shadow:none;background:transparent">
+    <div class="dfj-row"><span class="lbl">跳</span><span class="v"><b style="color:var(--blue)">${dfj.jmMain}</b></span></div>
+    <div class="dfj-row"><span class="lbl">独</span><span class="v">${pair(dfj.du[0])}${pair(dfj.du[1])}</span></div>
+    <div class="dfj-row"><span class="lbl">飞</span><span class="v">${dfj.fei.map(pair).join('')}</span></div>
+    <div class="dfj-row"><span class="lbl">精</span><span class="v">${dfj.jing.map(n=>`<span class="num">${n}</span>`).join('')}</span></div>
+    <div class="dfj-row"><span class="lbl">直</span><span class="v">${dfj.zhi.map(n=>`<span class="n">${n}</span>`).join('')}</span></div>
+    <div class="dfj-row"><span class="lbl">对</span><span class="v">${dfj.dui.map(n=>`<span class="n">${n}</span>`).join('')}</span></div>
+  </div>`;
+}
+let histSel=null;
+function renderHistory(){
+  const sec=document.getElementById('histSection');
+  if(sec.style.display==='none'||!sec.style.display) sec.style.display='';
+  const box=document.getElementById('histBox');
+  const h=loadHistory();
+  if(!h.length){ box.innerHTML='<div class="dfj-empty">还没有保存的历史推荐。每次打开 / 刷新页面会自动保存当天的推荐，之后这里就能看到（包括今天）。</div>'; return; }
+  const today=new Date();
+  const tds=`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+  const dayDiff=(ds)=>{ const d=new Date(ds+'T00:00:00'); return Math.round((new Date(tds+'T00:00:00')-d)/86400000); };
+  const label=(ds)=>{ const n=dayDiff(ds); return n===0?'今天':(n===1?'昨天':(n===2?'前天':n+'天前')); };
+  const cards=h.map(s=>{
+    const rel=label(s.genDate);
+    const isSel=histSel===s.genDate+'|'+s.game;
+    return `<div class="hist-card${isSel?' active':''}" data-k="${s.genDate}|${s.game}">
+      <div class="h-top"><b>${s.genDate}</b> <span class="h-rel">${rel}</span> <span class="h-game">${s.game}</span> <span class="h-win">窗口${WIN_LABEL[s.win]||s.win}·${PICK_LABEL[s.pick]||s.pick}</span></div>
+      <div class="h-sum">跳 <b>${s.dfj?s.dfj.jmMain:'—'}</b> · 独 <b>${s.dfj?(s.dfj.du.join('、')):'—'}</b> · AI五码 <b>${s.aiFive.join('')}</b> · 共识 <b>${s.consensusTop.join('')}</b></div>
+    </div>`;
+  }).join('');
+  box.innerHTML=`<div class="hist-list">${cards}</div><div id="histDetail"></div>`;
+  box.querySelectorAll('.hist-card').forEach(el=>{
+    el.onclick=()=>{ histSel=el.dataset.k; renderHistory(); };
+  });
+  if(histSel) renderHistoryDetail();
+}
+function renderHistoryDetail(){
+  const det=document.getElementById('histDetail'); if(!det) return;
+  const h=loadHistory(); const s=h.find(x=>x.genDate+'|'+x.game===histSel);
+  if(!s){ det.innerHTML=''; return; }
+  const liveDfj=duFeiJing(); const liveCons=masterConsensus(); const liveAi=aiAdvice();
+  const liveDfjObj=liveDfj?{jmMain:liveDfj.jmMain,du:liveDfj.du,fei:liveDfj.fei,jing:liveDfj.jing,zhi:liveDfj.zhi,dui:liveDfj.dui,pickLabel:liveDfj.pickLabel}:null;
+  det.innerHTML=`<div class="cmp">
+    <div class="cmp-col"><div class="cmp-h">${s.genDate}（${s.game}）</div>${dfjCompact(s.dfj)}
+      <div class="cmp-sub">大师共识：${s.consensusTop.map(d=>`<span class="chip-s">${d}</span>`).join('')}</div>
+      <div class="cmp-sub">AI 综合五码：<b>${s.aiFive.join(' ')}</b></div>
+      <div class="cmp-sub">大师推荐：${s.masters.map(m=>`${m.m}:${m.single||'—'}${m.dbl?('/'+m.dbl):''}${m.pick?('·单挑'+m.pick):''}`).join('；')}</div>
+    </div>
+    <div class="cmp-col"><div class="cmp-h">今日（实时 · ${g().name}）</div>${dfjCompact(liveDfjObj)}
+      <div class="cmp-sub">大师共识：${liveCons.top.map(d=>`<span class="chip-s">${d}</span>`).join('')}</div>
+      <div class="cmp-sub">AI 综合五码：<b>${liveAi.five.join(' ')}</b></div>
+    </div>
+  </div>
+  <div class="note-inline">对比说明：左为<b>所选历史日</b>的推荐，右为<b>今日实时</b>推荐（随最新开奖与刷新而变）。历史已存本机——明日再来即可回看"今天"的推荐并核对命中。开奖随机，命中恒 1/1000，仅供参考。</div>`;
+}
+
 function renderAll(){
   buildTabs(); buildWinSel(); buildPickSel();
-  renderCards(); renderCombo(); renderHCW(); renderFive(); renderDFJ(); renderSmart(); renderJump(); renderMasters(); renderAI();
+  renderDFJ(); renderMasters(); renderRank(); renderAI();
   const a=allData();
   const extra = localCachedCount>0 ? `（含本地补充 ${localCachedCount} 条，已自动载入历史数据）` : '';
   document.getElementById('status').textContent=`已加载 ${g().name}：${a[0].code}(${a[0].day}) ~ ${a[a.length-1].code}(${a[a.length-1].day})，共 ${a.length} 期。点击右上角可刷新最新开奖。${extra}`;
+  saveSnapshot();   // 每次渲染把当天推荐存到本机，供「历史推荐」回看对比
 }
 
 /* ---------- 联网刷新 ---------- */
@@ -1361,6 +1484,22 @@ function setAuto(on){
   if(on){ autoTimer=setInterval(()=>{ refresh(true); }, 30*60*1000); } // 每 30 分钟后台刷新
 }
 document.getElementById('autoBtn').onclick=()=>setAuto(!state.auto);
+document.getElementById('histBtn').onclick=()=>{
+  const sec=document.getElementById('histSection');
+  if(sec.style.display==='none'||!sec.style.display){ renderHistory(); }
+  else { sec.style.display='none'; }
+};
+function switchMain(t){
+  const dfj=document.getElementById('secDFJ'), night=document.getElementById('secNight');
+  const b1=document.getElementById('tabDFJ'), b2=document.getElementById('tabNight');
+  const showDfj = t!=='night';
+  dfj.style.display = showDfj?'':'none';
+  night.style.display = showDfj?'none':'';
+  b1.classList.toggle('active', showDfj);
+  b2.classList.toggle('active', !showDfj);
+}
+document.getElementById('tabDFJ').onclick=()=>switchMain('dfj');
+document.getElementById('tabNight').onclick=()=>switchMain('night');
 
 /* ---------- 初始化 ---------- */
 loadStored();
