@@ -293,7 +293,7 @@ const GAMES = {"fcsd":{"name":"福彩3D","pos":["百","十","个"],"data":[{"cod
 
 const WIN_OPTS = [28,56,112];
 const WIN_LABEL = {28:'近28期',56:'近56期',112:'近112期'};
-const PICK_OPTS = ['auto','hot','mix','cold'];
+const PICK_OPTS = ['auto','hot','cold'];
 const PICK_LABEL = {auto:'🤖自动', hot:'🔥全热', mix:'🌡️冷热搭配', cold:'❄️全冷'};
 const ODD = v=>v%2===1;
 const BIG = v=>v>=5;
@@ -948,14 +948,10 @@ function duFeiJing(mode){
     du=[cold[0],cold[1]]; supports=[cold[2],cold[3]];     // 全冷：胆码取最冷 2 个
     pool=[...cold].slice(0,6);                            // 6 个最冷号
     pickLabel='❄️全冷';
-  } else if(mode==='mix'){
-    du=[hot[0],cold[0]]; supports=[hot[1],cold[1]];       // 冷热搭配：胆码 1热1冷
-    pool=[hot[0],hot[1],hot[2],cold[0],cold[1],cold[2]];  // 3热 + 3冷
-    pickLabel='🌡️冷热搭配';
   } else {
     du=[hot[0],hot[1]]; supports=[hot[2],hot[3]];         // 全热：胆码取最热 2 个
     pool=[...hot].slice(0,6);                             // 6 个最热号
-    pickLabel='🔥全热';
+    pickLabel = mode==='hot' ? '🔥全热' : '🤖自动';
   }
   // 结合最新规律（跳跃 + 差距修正）：独码 = 最新规律中"最确定"的 2 个位的主推数字；支撑/池保留策略风味
   const jm=jumpRule();
