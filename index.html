@@ -32,6 +32,8 @@ header .sub{color:var(--sub);font-size:12px}
 .tab{padding:8px 14px;border-radius:20px;border:1px solid var(--line);background:var(--card);cursor:pointer;font-size:13px;color:var(--sub)}
 .tab.active{background:var(--blue);color:#fff;border-color:var(--blue)}
 .win-sel{display:flex;gap:4px;align-items:center}
+.dfj-sel{margin:2px 0 12px}
+.dfj-sel .wbtn{padding:7px 14px;font-size:13px;font-weight:600}
 #winSel{margin-left:auto}
 .win-sel span{color:var(--sub);font-size:12px}
 .wbtn{padding:6px 10px;border-radius:8px;border:1px solid var(--line);background:var(--card);cursor:pointer;font-size:12px;color:var(--sub)}
@@ -249,6 +251,11 @@ footer{margin-top:24px;font-size:11.5px;color:var(--sub);line-height:1.7;border-
 
   <section id="secDFJ">
     <h2>🎯 大师推荐 · 独飞精（师傅格式 · 每日主推）</h2>
+    <div class="win-sel dfj-sel" id="dfjSel">
+      <span>策略</span>
+      <button class="wbtn active" data-m="auto">🤖自动</button>
+      <button class="wbtn" data-m="hot">🔥热码</button>
+    </div>
     <div class="dfj" id="dfjBox"></div>
     <div class="note" id="dfjNote" style="margin-top:8px"></div>
   </section>
@@ -296,10 +303,10 @@ const BIG = v=>v>=5;
 const PRIME = v=>[2,3,5,7].includes(v);
 const UA = "Mozilla/5.0";
 
-let state = { game: Object.keys(GAMES)[0], win: 56, pick: 'auto' };
+let state = { game: Object.keys(GAMES)[0], win: 56, pick: 'auto', dfjMode: 'auto' };
 
 // 部署版本号：每次部署由 deploy.py 自动改写，用于手机"主屏幕"缓存自愈
-const BUILD = '20260829082441';
+const BUILD = '20260904205239';
 
 /* ---------- 数据访问 ---------- */
 function g(){ return GAMES[state.game]; }
@@ -936,25 +943,30 @@ function renderSmart(){
 
 /* ---------- 独飞精 · 胆码推荐（师傅格式） ---------- */
 function duFeiJing(mode){
-  mode = mode || effectivePick();
+  mode = mode || state.dfjMode || 'auto';
   const win=winData();
   const npos=g().pos.length;
   if(npos!==3) return null;                  // 仅 3 位玩法（福彩3D / 排列三）
   const {hot,cold}=fiveSets();
-  // 主力：取最热 2 个作胆码，热号作为候选池（已移除 全热/全冷/冷热搭配 策略切换，统一为自动主力）
+  // 基础：取最热 2 个作胆码，热号作为候选池
   let du, supports, pool, pickLabel;
   du=[hot[0],hot[1]]; supports=[hot[2],hot[3]];
   pool=[...hot].slice(0,6);
-  pickLabel='🤖自动';
-  // 结合最新规律（跳跃 + 差距修正）：独码 = 最新规律中"最确定"的 2 个位的主推数字；支撑/池保留策略风味
   const jm=jumpRule();
-  const order=[...Array(jm.npos).keys()].sort((a,b)=>jm.conf[b]-jm.conf[a]);
-  const jmDu=[ jm.main[order[0]], jm.main[order[1]!==undefined?order[1]:order[0]] ];
-  const supFromPool=pool.filter(x=>!jmDu.includes(x)).slice(0,2);
-  du=jmDu.slice();
-  supports=(supFromPool.length>=2? supFromPool : [...supFromPool, ...pool.filter(x=>!jmDu.includes(x)&&!supFromPool.includes(x))]).slice(0,2);
-  pool=[...new Set([...du, ...supports, ...pool])].slice(0,6);
   const jmMainStr=jm.main.join('');
+  let jmBlended=true;
+  // 自动：独码换成最新规律（跳跃+差距修正）最确定的两位；热码：保持纯热号推荐
+  if(mode==='hot'){
+    pickLabel='🔥热码'; jmBlended=false;
+  } else {
+    pickLabel='🤖自动';
+    const order=[...Array(jm.npos).keys()].sort((a,b)=>jm.conf[b]-jm.conf[a]);
+    const jmDu=[ jm.main[order[0]], jm.main[order[1]!==undefined?order[1]:order[0]] ];
+    const supFromPool=pool.filter(x=>!jmDu.includes(x)).slice(0,2);
+    du=jmDu.slice();
+    supports=(supFromPool.length>=2? supFromPool : [...supFromPool, ...pool.filter(x=>!jmDu.includes(x)&&!supFromPool.includes(x))]).slice(0,2);
+    pool=[...new Set([...du, ...supports, ...pool])].slice(0,6);
+  }
   const feiDigits=[...new Set([...du, ...supports])];     // 飞涉及的数字 = 独 ∪ supports
   // 上一期开奖（用于排除直/对回声）
   const last=win[win.length-1].d;
@@ -1024,7 +1036,7 @@ function duFeiJing(mode){
   const last2 = win.slice(-2);
   const anchors = [last2[last2.length-2]?.code, last2[last2.length-1]?.code].filter(Boolean);
   const hotSet=new Set(hot), coldSet=new Set(cold);
-  return {du, fei, jing, si, wu, liu, zhi, dui, anchors, hotSet, coldSet, pickLabel, mode,
+  return {du, fei, jing, si, wu, liu, zhi, dui, anchors, hotSet, coldSet, pickLabel, mode, jmBlended,
           jmMain:jmMainStr, jmCorr:jm.corr, jmRaw:jm.raw.join('')};
 }
 function renderDFJ(){
@@ -1052,7 +1064,7 @@ function renderDFJ(){
       <span class="date">${dateStr}</span>
       <span class="legend">策略：${r.pickLabel} · 窗口：${WIN_LABEL[state.win]} · 独=胆码 · 飞=两码 · 精=精选 · 直=组六 · 对=对子</span>
     </div>
-    <div class="dfj-row"><span class="lbl">跳</span><span class="v"><b style="color:var(--blue)">${r.jmMain}</b> <small style="color:var(--sub)">最新规律主推（跳跃+差距修正）· 已融入下方独码</small></span></div>
+    <div class="dfj-row"><span class="lbl">跳</span><span class="v"><b style="color:var(--blue)">${r.jmMain}</b> <small style="color:var(--sub)">最新规律主推（跳跃+差距修正）${r.jmBlended?'· 已融入下方独码':'· 本模式采用纯热号，规律仅作参考'}</small></span></div>
     <div class="dfj-row"><span class="lbl">独</span><span class="v">${duPair(r.du[0])}${duPair(r.du[1])} <small style="color:var(--blue)">← 取最新规律最确定两位</small></span></div>
     <div class="dfj-row"><span class="lbl">飞</span><span class="v">${r.fei.map(p=>`<span class="pair ${p.split('').map(numCls).filter(Boolean).join(' ')}">${p}</span>`).join('')}</span></div>
     <div class="dfj-row"><span class="lbl">精</span><span class="v">${r.jing.map(n=>`<span class="num">${n}</span>`).join('')}</span></div>
@@ -1377,7 +1389,7 @@ function saveSnapshot(){
   const snap={
     genDate:ds, game, win:state.win, pick:state.pick,
     lastDraw: last? {code:last.code, day:last.day, d:last.d}:null,
-    dfj: r? {jmMain:r.jmMain, du:r.du, fei:r.fei, jing:r.jing, si:r.si, wu:r.wu, liu:r.liu, zhi:r.zhi, dui:r.dui, pickLabel:r.pickLabel}:null,
+    dfj: r? {jmMain:r.jmMain, du:r.du, fei:r.fei, jing:r.jing, si:r.si, wu:r.wu, liu:r.liu, zhi:r.zhi, dui:r.dui, pickLabel:r.pickLabel, dfjMode:r.mode}:null,
     masters: MASTERS.map(m=>({m:m.m,src:m.src,single:m.single,dbl:m.dbl,kill:m.kill,pick:m.pick})),
     consensusTop: cons.top, consensusRanked: cons.ranked,
     aiFive: a.five
@@ -1455,37 +1467,63 @@ function renderAll(){
   saveSnapshot();   // 每次渲染把当天推荐存到本机，供「历史推荐」回看对比
 }
 
-/* ---------- 联网刷新 ---------- */
+/* ---------- 合并远端历史（同源 history.json，避免跨域被浏览器拦截） ---------- */
+function mergeRemote(remote){
+  let updated=0;
+  for(const key of Object.keys(GAMES)){
+    const gm=GAMES[key];
+    const rd=remote && remote.games && remote.games[key];
+    if(!rd || !Array.isArray(rd.draws)) continue;
+    const byCode=new Map(gm.data.map(r=>[r.code,r]));
+    for(const r of rd.draws){ if(!byCode.has(r.code)){ byCode.set(r.code,r); updated++; } }
+    if(updated>0 || true){
+      gm.data=[...byCode.values()].sort((x,y)=>String(x.code).localeCompare(String(y.code)));
+    }
+    if(rd.next && rd.next.next_code) gm.next=rd.next;
+  }
+  return updated;
+}
+
+/* ---------- 联网刷新（拉取同域 history.json，无跨域限制） ---------- */
 async function refresh(bg){
   const btn=document.getElementById('refreshBtn');
   const st=document.getElementById('status');
-  if(!bg){ btn.disabled=true; st.textContent='正在联网获取最新开奖…'; }
-  let updated=0, fails=0, latest='', lastErr='';
-  for(const key of Object.keys(GAMES)){
-    const gm=GAMES[key];
+  if(!bg){ btn.disabled=true; st.textContent='正在获取最新开奖…'; }
+  let updated=0, fails=0, lastErr='';
+  try{
+    const r=await fetch('history.json?_='+Date.now(), {cache:'no-store'});
+    if(r.ok){
+      const remote=await r.json();
+      updated=mergeRemote(remote);
+    } else { fails++; lastErr='history.json HTTP '+r.status; }
+  }catch(e){ fails++; lastErr=e.message; }
+  // 兜底：history.json 不可用时尝试原始接口（在 github.io 上会被跨域拦截，本地/其它源可能可用）
+  if(fails===0 && updated===0){
     try{
-      const r=await fetch(`https://api.huiniao.top/interface/home/lotteryHistory?type=${gm.type}&page=1&limit=8`);
-      const j=await r.json();
-      const lst=j.data.data.list||[];
-      for(const it of lst){
-        const c=String(it.code);
-        if(gm.data.some(x=>x.code===c)) continue;
-        const d = gm.str ? [it.one,it.two,it.three,it.four,it.five].map(Number)
-                          : [Number(it.one),Number(it.two),Number(it.three)];
-        gm.data.push({code:c, day:it.day, d});
-        if(it.next_code) gm.next={next_code:String(it.next_code), next_open_time:it.next_open_time};
-        updated++;
+      for(const key of Object.keys(GAMES)){
+        const gm=GAMES[key];
+        const rr=await fetch(`https://api.huiniao.top/interface/home/lotteryHistory?type=${gm.type}&page=1&limit=8`);
+        const j=await rr.json();
+        const lst=j.data.data.list||[];
+        const byCode=new Map(gm.data.map(x=>[x.code,x]));
+        for(const it of lst){
+          const c=String(it.code);
+          if(byCode.has(c)) continue;
+          const d = gm.str ? [it.one,it.two,it.three,it.four,it.five].map(Number)
+                            : [Number(it.one),Number(it.two),Number(it.three)];
+          byCode.set(c,{code:c, day:it.day, d});
+          if(it.next_code) gm.next={next_code:String(it.next_code), next_open_time:it.next_open_time};
+        }
+        gm.data=[...byCode.values()].sort((x,y)=>String(x.code).localeCompare(String(y.code)));
       }
-      gm.data.sort((x,y)=>String(x.code).localeCompare(String(y.code)));
-      latest=gm.data[gm.data.length-1].code;
-    }catch(e){ fails++; lastErr=e.message; }
+    }catch(e){ /* 跨域拦截时静默忽略，使用内嵌数据 */ }
   }
   if(!bg) btn.disabled=false;
   saveStored();
   renderAll();
   const tag = bg ? '自动' : '';
-  if(updated>0) st.textContent=`✅ ${tag}已联网追加 ${updated} 条新开奖，并自动补充进历史数据（当前玩法最新期号 ${lastRec().code}）。下一期预测已基于最新开奖重新计算；结果已本地保存，下次打开自动载入。`;
-  else if(fails) st.textContent=`⚠️ ${tag}刷新失败：${lastErr||'网络或浏览器拦截'}。仍可使用内置历史数据（最新 ${lastRec().code}）。如长期失败，多为接口限流或该源不可用。`;
+  if(updated>0) st.textContent=`✅ ${tag}已追加 ${updated} 条新开奖，并自动补充进历史数据（当前玩法最新期号 ${lastRec().code}）。预测已基于最新开奖重新计算；结果已本地保存。`;
+  else if(fails) st.textContent=`⚠️ ${tag}刷新失败：${lastErr||'网络'}。仍可使用内置历史数据（最新 ${lastRec().code}）。`;
   else st.textContent=`${tag}已是最新（最新期号 ${lastRec().code}）。`;
 }
 
@@ -1518,6 +1556,15 @@ function switchMain(t){
 }
 document.getElementById('tabDFJ').onclick=()=>switchMain('dfj');
 document.getElementById('tabNight').onclick=()=>switchMain('night');
+
+/* ---------- 大师推荐 策略切换（自动 / 热码） ---------- */
+document.querySelectorAll('#dfjSel .wbtn').forEach(b=>{
+  b.onclick=()=>{
+    state.dfjMode=b.dataset.m;
+    document.querySelectorAll('#dfjSel .wbtn').forEach(x=>x.classList.toggle('active', x===b));
+    renderDFJ();
+  };
+});
 
 /* ---------- 初始化 ---------- */
 loadStored();

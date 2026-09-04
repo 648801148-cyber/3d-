@@ -1,1 +1,1 @@
-{"v": "20260829082441", "deployed": "2026-08-29T08:27:43Z"}
+{"v": "20260904205239", "note": "page self-heal: if local BUILD != this v, force full reload"}
